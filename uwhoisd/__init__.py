@@ -28,6 +28,8 @@ suffix=whois-servers.net
 [prefixes]
 
 [recursion_patterns]
+
+[broken]
 """
 
 logger = logging.getLogger('uwhoisd')
@@ -45,6 +47,7 @@ class UWhois(object):
         'recursion_patterns',
         'registry_whois',
         'suffix',
+        'broken',
     )
 
     def __init__(self):
@@ -53,6 +56,7 @@ class UWhois(object):
         self.overrides = {}
         self.prefixes = {}
         self.recursion_patterns = {}
+        self.broken = {}
         self.registry_whois = False
         self.conservative = ()
 
@@ -80,7 +84,7 @@ class UWhois(object):
             for zone in parser.get('uwhoisd', 'conservative').split("\n")
             if zone != '']
 
-        for section in ('overrides', 'prefixes'):
+        for section in ('overrides', 'prefixes', 'broken'):
             self._get_dict(parser, section)
 
         for zone, pattern in parser.items('recursion_patterns'):
@@ -158,6 +162,10 @@ class UWhois(object):
             response = self._thin_query(zone, response, port, query)
         elif server in self.recursion_patterns:
             response = self._thin_query(server, response, port, query)
+
+
+        if self.broken.get(server) is not None:
+            response += self.broken.get(server)
         return response
 
 
