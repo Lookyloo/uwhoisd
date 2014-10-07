@@ -142,12 +142,11 @@ class UWhois(object):
         """
         return self.prefixes.get(server)
 
-    def get_recursion_pattern(self, zone, server):
+    def get_recursion_pattern(self, server):
         """
         Get the recursion pattern after querying a server.
         """
-        return self.recursion_patterns.get(zone) or \
-            self.recursion_patterns.get(server)
+        return self.recursion_patterns.get(server)
 
     def get_zone(self, query):
         """
@@ -197,6 +196,7 @@ class UWhois(object):
         """
         Query a more detailled Whois server if possible.
         """
+        # FIXME: if a port is provided in the response, it is ignored.
         server = self.get_registrar_whois_server(pattern, response)
         prefix = self.get_prefix(server)
         if server is not None:
@@ -217,7 +217,7 @@ class UWhois(object):
         response = self._run_query(server, port, query, prefix)
 
         # Thin registry? Query the registrar's WHOIS server.
-        recursion_pattern = self.get_recursion_pattern(zone, server)
+        recursion_pattern = self.get_recursion_pattern(server)
         if recursion_pattern is not None:
             response = self._thin_query(recursion_pattern, response, port,
                                         query)
