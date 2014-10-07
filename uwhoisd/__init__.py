@@ -114,11 +114,11 @@ class UWhois(object):
         matches = self.recursion_patterns[zone].search(response)
         return None if matches is None else matches.group('server')
 
-    def get_prefix(self, zone):
+    def get_prefix(self, server):
         """
         Gets the prefix required when querying the servers for the given zone.
         """
-        return self.prefixes[zone] if zone in self.prefixes else ''
+        return self.prefixes.get(server)
 
     def _thin_query(self, server_index, response, port, query):
         server = self.get_registrar_whois_server(server_index, response)
