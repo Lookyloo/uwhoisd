@@ -138,15 +138,21 @@ class UWhois(object):
 
     def get_prefix(self, server):
         """
-        Gets the prefix required when querying the servers for the given zone.
+        Gets the prefix required when querying the servers.
         """
         return self.prefixes.get(server)
 
     def get_recursion_pattern(self, zone, server):
+        """
+        Get the recursion pattern after querying a server.
+        """
         return self.recursion_patterns.get(zone) or \
             self.recursion_patterns.get(server)
 
     def get_zone(self, query):
+        """
+        Get the zone of a query.
+        """
         for zone in self.conservative:
             if query.endswith('.' + zone):
                 break
@@ -160,6 +166,9 @@ class UWhois(object):
         return zone
 
     def _run_query(self, server, port, query, prefix='', is_recursive=False):
+        """
+        Run the query against a server.
+        """
         ratelimit_details = self.ratelimit.get(server)
         if self.redis is not None and ratelimit_details is not None:
             while self.redis.exists(server):
@@ -169,7 +178,7 @@ class UWhois(object):
             max_key = server + '_max'
             while self.redis.zcard(max_key) > max_server:
                 logger.info("Rate limiting on %s", server)
-                self.redis.zremrangebyscore(max_key, '-inf', int(time.time()))
+                self.redis.zremrangebyscore(max_key, '-inf', time.time())
                 time.sleep(1)
         with net.WhoisClient(server, port) as client:
             if is_recursive:
@@ -177,13 +186,12 @@ class UWhois(object):
             else:
                 logger.info("Querying %s about %s", server, query)
             if self.redis is not None and ratelimit_details is not None:
-                self.redis.zremrangebyscore(max_key, '-inf', int(time.time()))
+                self.redis.zremrangebyscore(max_key, '-inf', time.time())
                 self.redis.setex(server, ratelimit_details.split()[0], '')
                 self.redis.zadd(max_key, time.time() + 3600, query)
             if prefix is not None:
-                return client.whois('{} {}'.format(prefix, query))
-            else:
-                return client.whois(query)
+                query = '{} {}'.format(prefix, query)
+            return client.whois(query)
 
     def _thin_query(self, pattern, response, port, query):
         """
@@ -260,7 +268,6 @@ def main():
                 return response
         elif redis_cache:
             logger.info("Redis caching activated")
-            import redis
             redis_host = parser.get('redis_cache', 'host')
             redis_port = parser.getint('redis_cache', 'port')
             redis_database = parser.getint('redis_cache', 'db')
