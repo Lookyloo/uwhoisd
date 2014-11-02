@@ -14,8 +14,10 @@ from uwhoisd import net, utils
 
 try:
     import redis
+    redis_lib = True
 except ImportError:
     print 'Redis module unavailable, redis cache and rate limiting unavailable'
+    redis_lib = False
 
 
 USAGE = "Usage: %s <config>"
@@ -39,7 +41,7 @@ suffix=whois-servers.net
 
 [ratelimit]
 
-[redis]
+[redis_server]
 """
 
 logger = logging.getLogger('uwhoisd')
@@ -59,7 +61,7 @@ class UWhois(object):
         'suffix',
         'broken',
         'ratelimit',
-        'redis',
+        'redis_server',
     )
 
     def __init__(self):
@@ -72,7 +74,7 @@ class UWhois(object):
         self.ratelimit = {}
         self.registry_whois = False
         self.conservative = ()
-        self.redis = None
+        self.redis_server = None
 
     def _get_dict(self, parser, section):
         """
@@ -101,11 +103,11 @@ class UWhois(object):
         for section in ('overrides', 'prefixes', 'broken'):
             self._get_dict(parser, section)
 
-        if utils.to_bool(parser.get('ratelimit', 'enable')):
+        if utils.to_bool(parser.get('ratelimit', 'enable')) and redis_lib:
             redis_host = parser.get('ratelimit', 'host')
             redis_port = parser.getint('ratelimit', 'port')
             redis_database = parser.getint('ratelimit', 'db')
-            self.redis = redis.StrictRedis(redis_host, redis_port,
+            self.redis_server = redis.StrictRedis(redis_host, redis_port,
                                            redis_database)
             self._get_dict(parser, 'ratelimit')
 
@@ -169,25 +171,25 @@ class UWhois(object):
         Run the query against a server.
         """
         ratelimit_details = self.ratelimit.get(server)
-        if self.redis is not None and ratelimit_details is not None:
-            while self.redis.exists(server):
+        if self.redis_server is not None and ratelimit_details is not None:
+            while self.redis_server.exists(server):
                 logger.info("Rate limiting on %s (burst)", server)
                 time.sleep(1)
             max_server = ratelimit_details.split()[1]
             max_key = server + '_max'
-            while self.redis.zcard(max_key) > max_server:
+            while self.redis_server.zcard(max_key) > max_server:
                 logger.info("Rate limiting on %s", server)
-                self.redis.zremrangebyscore(max_key, '-inf', time.time())
+                self.redis_server.zremrangebyscore(max_key, '-inf', time.time())
                 time.sleep(1)
         with net.WhoisClient(server, port) as client:
             if is_recursive:
                 logger.info("Recursive query to %s about %s", server, query)
             else:
                 logger.info("Querying %s about %s", server, query)
-            if self.redis is not None and ratelimit_details is not None:
-                self.redis.zremrangebyscore(max_key, '-inf', time.time())
-                self.redis.setex(server, ratelimit_details.split()[0], '')
-                self.redis.zadd(max_key, time.time() + 3600, query)
+            if self.redis_server is not None and ratelimit_details is not None:
+                self.redis_server.zremrangebyscore(max_key, '-inf', time.time())
+                self.redis_server.setex(server, ratelimit_details.split()[0], '')
+                self.redis_server.zadd(max_key, time.time() + 3600, query)
             if prefix is not None:
                 query = '{} {}'.format(prefix, query)
             return client.whois(query)
@@ -266,7 +268,7 @@ def main():
                     response = uwhois.whois(query)
                     cache[query] = response
                 return response
-        elif redis_cache:
+        elif redis_cache and redis_lib:
             logger.info("Redis caching activated")
             redis_host = parser.get('redis_cache', 'host')
             redis_port = parser.getint('redis_cache', 'port')
