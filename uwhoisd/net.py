@@ -66,8 +66,8 @@ def respond(whois, addr):
 
     try:
         diesel.send(whois(query))
-    except diesel.ClientConnectionError:
-        logger.info("Connection refused")
+    except diesel.ClientConnectionError as e:
+        logger.warning("Connection refused: %s", e)
         diesel.send("; Connection refused by downstream server\r\n")
     except diesel.ConnectionClosed:
         logger.info("Connection closed by %s", addr)
