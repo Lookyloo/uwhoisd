@@ -29,6 +29,7 @@ CONFIG = """
 iface=0.0.0.0
 port=4343
 registry_whois=false
+page_feed=true
 suffix=whois-servers.net
 
 [overrides]
@@ -58,6 +59,7 @@ class UWhois(object):
         'prefixes',
         'recursion_patterns',
         'registry_whois',
+        'page_feed',
         'suffix',
         'broken',
         'ratelimit',
@@ -73,6 +75,7 @@ class UWhois(object):
         self.broken = {}
         self.ratelimit = {}
         self.registry_whois = False
+        self.page_feed = True
         self.conservative = ()
         self.redis_server = None
 
@@ -94,6 +97,8 @@ class UWhois(object):
         """
         self.registry_whois = utils.to_bool(
             parser.get('uwhoisd', 'registry_whois'))
+        self.page_feed = utils.to_bool(
+            parser.get('uwhoisd', 'page_feed'))
         self.suffix = parser.get('uwhoisd', 'suffix')
         self.conservative = [
             zone
@@ -219,10 +224,19 @@ class UWhois(object):
         response = self._run_query(server, port, query, prefix)
 
         # Thin registry? Query the registrar's WHOIS server.
-        recursion_pattern = self.get_recursion_pattern(server)
-        if recursion_pattern is not None:
-            response = self._thin_query(recursion_pattern, response, port,
-                                        query)
+        if zone in self.recursion_patterns:
+            server = self.get_registrar_whois_server(zone, response)
+            if server is not None:
+                if not self.registry_whois:
+                    response = ""
+                elif self.page_feed:
+                    # A form feed character so it's possible to find the split.
+                    respond += "\f"
+                with net.WhoisClient(server, port) as client:
+                    logger.info(
+                        "Recursive query to %s about %s",
+                        server, query)
+                    response += client.whois(query)
 
         if self.broken.get(server) is not None:
             response += self.broken.get(server)
@@ -289,7 +303,7 @@ def main():
         else:
             logger.info("Caching deactivated")
             whois = uwhois.whois
-    except Exception, ex:  # pylint: disable-msg=W0703
+    except Exception as ex:  # pylint: disable-msg=W0703
         print >> sys.stderr, "Could not parse config file: %s" % str(ex)
         return 1
 
