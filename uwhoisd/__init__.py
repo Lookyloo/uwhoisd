@@ -112,8 +112,7 @@ class UWhois(object):
             redis_host = parser.get('ratelimit', 'host')
             redis_port = parser.getint('ratelimit', 'port')
             redis_database = parser.getint('ratelimit', 'db')
-            self.redis_server = redis.StrictRedis(redis_host, redis_port,
-                                           redis_database)
+            self.redis_server = redis.StrictRedis(redis_host, redis_port, redis_database)
             self._get_dict(parser, 'ratelimit')
 
         for zone, pattern in parser.items('recursion_patterns'):
@@ -209,6 +208,9 @@ class UWhois(object):
         if server is not None:
             if not self.registry_whois:
                 response = ""
+            elif self.page_feed:
+                # A form feed character so it's possible to find the split.
+                response += "\f"
             response += self._run_query(server, port, query, prefix, True)
         return response
 
@@ -224,19 +226,9 @@ class UWhois(object):
         response = self._run_query(server, port, query, prefix)
 
         # Thin registry? Query the registrar's WHOIS server.
-        if zone in self.recursion_patterns:
-            server = self.get_registrar_whois_server(zone, response)
-            if server is not None:
-                if not self.registry_whois:
-                    response = ""
-                elif self.page_feed:
-                    # A form feed character so it's possible to find the split.
-                    respond += "\f"
-                with net.WhoisClient(server, port) as client:
-                    logger.info(
-                        "Recursive query to %s about %s",
-                        server, query)
-                    response += client.whois(query)
+        recursion_pattern = self.get_recursion_pattern(server)
+        if recursion_pattern is not None:
+            response = self._thin_query(recursion_pattern, response, port, query)
 
         if self.broken.get(server) is not None:
             response += self.broken.get(server)
