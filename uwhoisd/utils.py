@@ -8,9 +8,9 @@ try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
-import ConfigParser
+
 import re
-import StringIO
+from io import StringIO
 import time
 
 
@@ -25,7 +25,7 @@ def make_config_parser(defaults=None, config_path=None):
     """
     parser = configparser.SafeConfigParser()
     if defaults is not None:
-        with contextlib.closing(StringIO.StringIO(defaults)) as fp:
+        with contextlib.closing(StringIO(defaults)) as fp:
             parser.readfp(fp)
     if config_path is not None:
         parser.read(config_path)
@@ -92,7 +92,7 @@ def decode_value(s):
         if s[0] != s[-1]:
             raise ValueError(
                 "The trailing quote be present and match the leading quote.")
-        return s[1:-1].decode('string_escape')
+        return s[1:-1]
     return s
 
 

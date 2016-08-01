@@ -16,7 +16,7 @@ try:
     import redis
     redis_lib = True
 except ImportError:
-    print 'Redis module unavailable, redis cache and rate limiting unavailable'
+    print('Redis module unavailable, redis cache and rate limiting unavailable')
     redis_lib = False
 
 
@@ -167,7 +167,11 @@ class UWhois(object):
             elif ':' in query:
                 zone = 'ipv6'
             else:
-                _, zone = utils.split_fqdn(query)
+                splitted = utils.split_fqdn(query)
+                if len(splitted) == 2:
+                    _, zone = splitted
+                else:
+                    zone = None
         return zone
 
     def _run_query(self, server, port, query, prefix='', is_recursive=False):
@@ -185,18 +189,18 @@ class UWhois(object):
                 logger.info("Rate limiting on %s", server)
                 self.redis_server.zremrangebyscore(max_key, '-inf', time.time())
                 time.sleep(1)
-        with net.WhoisClient(server, port) as client:
-            if is_recursive:
-                logger.info("Recursive query to %s about %s", server, query)
-            else:
-                logger.info("Querying %s about %s", server, query)
-            if self.redis_server is not None and ratelimit_details is not None:
-                self.redis_server.zremrangebyscore(max_key, '-inf', time.time())
-                self.redis_server.setex(server, ratelimit_details.split()[0], '')
-                self.redis_server.zadd(max_key, time.time() + 3600, query)
-            if prefix is not None:
-                query = '{} {}'.format(prefix, query)
-            return client.whois(query)
+        client = net.WhoisClient(server, port)
+        if is_recursive:
+            logger.info("Recursive query to %s about %s", server, query)
+        else:
+            logger.info("Querying %s about %s", server, query)
+        if self.redis_server is not None and ratelimit_details is not None:
+            self.redis_server.zremrangebyscore(max_key, '-inf', time.time())
+            self.redis_server.setex(server, ratelimit_details.split()[0], '')
+            self.redis_server.zadd(max_key, time.time() + 3600, query)
+        if prefix is not None:
+            query = '{} {}'.format(prefix, query)
+        return client.whois(query)
 
     def _thin_query(self, pattern, response, port, query):
         """
@@ -219,12 +223,14 @@ class UWhois(object):
         Query the appropriate WHOIS server.
         """
         # Figure out the zone whose WHOIS server we're meant to be querying.
+        query = query.decode().strip()
         zone = self.get_zone(query)
+        if not zone:
+            return None
         # Query the registry's WHOIS server.
         server, port = self.get_whois_server(zone)
         prefix = self.get_prefix(server)
         response = self._run_query(server, port, query, prefix)
-
         # Thin registry? Query the registrar's WHOIS server.
         recursion_pattern = self.get_recursion_pattern(server)
         if recursion_pattern is not None:
@@ -240,7 +246,7 @@ def main():
     Execute the daemon.
     """
     if len(sys.argv) != 2:
-        print >> sys.stderr, USAGE % os.path.basename(sys.argv[0])
+        print(USAGE % os.path.basename(sys.argv[0]), file=sys.stderr)
         return 1
 
     logging.config.fileConfig(sys.argv[1])
@@ -290,15 +296,15 @@ def main():
                     response = uwhois.whois(query)
                     redis_cache.setex(query, redis_expire, response)
                 else:
+                    response = response.decode()
                     logger.info("Redis cache hit for %s", query)
                 return response
         else:
             logger.info("Caching deactivated")
             whois = uwhois.whois
     except Exception as ex:  # pylint: disable-msg=W0703
-        print >> sys.stderr, "Could not parse config file: %s" % str(ex)
+        print("Could not parse config file: %s" % str(ex), file=sys.stderr)
         return 1
-
     net.start_service(iface, port, whois)
     return 0
 
