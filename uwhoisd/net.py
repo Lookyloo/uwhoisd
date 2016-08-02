@@ -10,6 +10,7 @@ from tornado import gen
 from tornado.ioloop import IOLoop
 from tornado.tcpserver import TCPServer
 
+from uwhoisd import utils
 
 CRLF = b'\r\n'
 
@@ -27,22 +28,26 @@ class WhoisClient(object):
         self.port = port
 
     def whois(self, query):
-        to_return = ''
+        to_return = b''
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.connect((self.server, self.port))
-                sock.sendall(bytes(query + "\n", "utf-8"))
+                sock.sendall('{}\n'.format(query).encode())
                 while True:
-                    data = str(sock.recv(1024), "utf-8")
+                    data = sock.recv(2048)
                     if data:
                         to_return += data
                         continue
                     break
-        except socket.gaierror as e:
+        except OSError as e:
+            # Catches all socket.* exceptions
+            return '{}: {}\n'.format(self.server, e)
+        except ConnectionError as e:
+            # Catches all Connection*Error exceptions
             return '{}: {}\n'.format(self.server, e)
         except Exception as e:
             logger.exception(e)
-        return to_return
+        return to_return.decode()
 
 
 class WhoisListener(TCPServer):
@@ -56,9 +61,11 @@ class WhoisListener(TCPServer):
         self.stream = stream
         try:
             whois_query = yield self.stream.read_until(CRLF)
-            whois_entry = self.whois(whois_query)
-            if not whois_entry:
-                whois_entry = 'Invalid query.\n'
+            whois_query = whois_query.decode().strip().lower()
+            if not utils.is_well_formed_fqdn(whois_query) and ':' not in whois_query:
+                whois_entry = "; Bad request: '{}'\r\n".format(whois_query)
+            else:
+                whois_entry = self.whois(whois_query)
             yield self.stream.write(whois_entry.encode())
         except Exception as e:
             logger.exception(e)

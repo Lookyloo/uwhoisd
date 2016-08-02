@@ -167,11 +167,7 @@ class UWhois(object):
             elif ':' in query:
                 zone = 'ipv6'
             else:
-                splitted = utils.split_fqdn(query)
-                if len(splitted) == 2:
-                    _, zone = splitted
-                else:
-                    zone = None
+                _, zone = utils.split_fqdn(query)
         return zone
 
     def _run_query(self, server, port, query, prefix='', is_recursive=False):
@@ -223,10 +219,7 @@ class UWhois(object):
         Query the appropriate WHOIS server.
         """
         # Figure out the zone whose WHOIS server we're meant to be querying.
-        query = query.decode().strip()
         zone = self.get_zone(query)
-        if not zone:
-            return None
         # Query the registry's WHOIS server.
         server, port = self.get_whois_server(zone)
         prefix = self.get_prefix(server)
@@ -287,7 +280,8 @@ def main():
             redis_database = parser.getint('redis_cache', 'db')
             redis_expire = parser.getint('redis_cache', 'expire')
             redis_cache = redis.StrictRedis(redis_host, redis_port,
-                                            redis_database)
+                                            redis_database,
+                                            decode_responses=True)
 
             def whois(query):
                 """Redis caching wrapper around UWhois."""
@@ -296,7 +290,6 @@ def main():
                     response = uwhois.whois(query)
                     redis_cache.setex(query, redis_expire, response)
                 else:
-                    response = response.decode()
                     logger.info("Redis cache hit for %s", query)
                 return response
         else:
