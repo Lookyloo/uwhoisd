@@ -71,7 +71,7 @@ def decode_value(s):
     'foo'
     >>> decode_value('"foo"')
     'foo'
-    >>> decode_value('"foo\\\\nbar\"')
+    >>> decode_value('"foo\\nbar\"')
     'foo\\nbar'
     >>> decode_value('foo\\nbar')
     'foo\\nbar'
