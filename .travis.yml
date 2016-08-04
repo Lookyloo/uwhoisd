@@ -10,7 +10,9 @@ python:
   - "nightly"
 
 install:
+  - pip install coveralls
+  - pip install codecov
   - pip install .
 
 script:
-  - nosetests
+  - nosetests --with-coverage --cover-package=uwhoisd
