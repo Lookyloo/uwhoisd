@@ -23,6 +23,4 @@ setup(
         'Topic :: Security',
         'Topic :: Internet',
     ],
-    tests_requires=['nose'],
-    test_suite='nose.collector',
 )

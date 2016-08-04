@@ -17,7 +17,7 @@ install:
   - pip install codecov
   - pip install .
   - pushd client
-  - pip install .
+  - python setup.py install
   - popd
 
 script:
