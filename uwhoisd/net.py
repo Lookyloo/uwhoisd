@@ -40,7 +40,7 @@ class WhoisClient(object):
                         bytes_whois += data
                         continue
                     break
-            to_return = bytes_whois.decode()
+            to_return = str(bytes_whois, 'utf-8', 'ignore')
         except OSError as e:
             # Catches all socket.* exceptions
             return '{}: {}\n'.format(self.server, e)
