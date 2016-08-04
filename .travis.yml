@@ -18,13 +18,15 @@ install:
   - pip install .
   - cp travis_config/uwhoisd.ini extra/uwhoisd.ini
   - pushd client
-  - python setup.py install
+  - pip install .
   - popd
 
 script:
-  - coverage run --source=uwhoisd uwhoisd/__init__.py extra/uwhoisd.ini &
+  - coverage run --parallel-mode --source=uwhoisd uwhoisd/__init__.py extra/uwhoisd.ini &
+  - pid=$!
   - sleep 15
   - nosetests --with-coverage --cover-package=uwhoisd
+  - kill -s INT $pid
   - coverage combine .coverage*
 
 after_success:
