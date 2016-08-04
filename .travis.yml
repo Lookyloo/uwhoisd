@@ -16,6 +16,7 @@ install:
   - pip install coveralls
   - pip install codecov
   - pip install .
+  - cp travis_config/uwhoisd.ini extra/uwhoisd.ini
   - pushd client
   - python setup.py install
   - popd
