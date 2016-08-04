@@ -6,13 +6,13 @@ import logging
 import signal
 import socket
 
+import tornado
 from tornado import gen
 from tornado.ioloop import IOLoop
 from tornado.tcpserver import TCPServer
 
 from uwhoisd import utils
 
-CRLF = b'\r\n'
 
 logger = logging.getLogger('uwhoisd')
 
@@ -28,17 +28,19 @@ class WhoisClient(object):
         self.port = port
 
     def whois(self, query):
-        to_return = b''
+        to_return = ''
         try:
+            bytes_whois = b''
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.connect((self.server, self.port))
                 sock.sendall('{}\n'.format(query).encode())
                 while True:
                     data = sock.recv(2048)
                     if data:
-                        to_return += data
+                        bytes_whois += data
                         continue
                     break
+            to_return = bytes_whois.decode()
         except OSError as e:
             # Catches all socket.* exceptions
             return '{}: {}\n'.format(self.server, e)
@@ -47,7 +49,7 @@ class WhoisClient(object):
             return '{}: {}\n'.format(self.server, e)
         except Exception as e:
             logger.exception(e)
-        return to_return.decode()
+        return to_return
 
 
 class WhoisListener(TCPServer):
@@ -60,13 +62,15 @@ class WhoisListener(TCPServer):
     def handle_stream(self, stream, address):
         self.stream = stream
         try:
-            whois_query = yield self.stream.read_until(CRLF)
+            whois_query = yield self.stream.read_until_regex(b'\s')
             whois_query = whois_query.decode().strip().lower()
             if not utils.is_well_formed_fqdn(whois_query) and ':' not in whois_query:
                 whois_entry = "; Bad request: '{}'\r\n".format(whois_query)
             else:
                 whois_entry = self.whois(whois_query)
             yield self.stream.write(whois_entry.encode())
+        except tornado.iostream.StreamClosedError as e:
+            logger.warning('Connexion closed by client {}.'.format(address))
         except Exception as e:
             logger.exception(e)
         self.stream.close()
@@ -76,6 +80,7 @@ def start_service(iface, port, whois):
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
     server = WhoisListener(whois)
-    server.listen(port, iface)
+    server.bind(port, iface)
+    server.start(None)
     IOLoop.instance().start()
     IOLoop.instance().close()

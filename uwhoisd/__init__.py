@@ -179,7 +179,7 @@ class UWhois(object):
             while self.redis_server.exists(server):
                 logger.info("Rate limiting on %s (burst)", server)
                 time.sleep(1)
-            max_server = ratelimit_details.split()[1]
+            max_server = int(ratelimit_details.split()[1])
             max_key = server + '_max'
             while self.redis_server.zcard(max_key) > max_server:
                 logger.info("Rate limiting on %s", server)

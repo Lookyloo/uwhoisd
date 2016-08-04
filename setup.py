@@ -29,7 +29,8 @@ setup(
         'wheel',
     ],
     install_requires=[
-        'diesel>=2.1.1',
+        'tornado',
+        'redis'
     ],
 
     entry_points={
