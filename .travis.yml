@@ -2,6 +2,9 @@ language: python
 
 cache: pip
 
+services:
+  - redis-server
+
 python:
   - "3.3"
   - "3.4"
@@ -13,6 +16,16 @@ install:
   - pip install coveralls
   - pip install codecov
   - pip install .
+  - pushd client
+  - pip install .
+  - popd
 
 script:
+  - coverage run --source=uwhoisd uwhoisd/__init__.py extra/uwhoisd.ini &
+  - sleep 15
   - nosetests --with-coverage --cover-package=uwhoisd
+  - coverage combine .coverage*
+
+after_success:
+  - codecov
+  - coveralls
