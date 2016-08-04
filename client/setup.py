@@ -4,7 +4,7 @@ from setuptools import setup
 
 
 setup(
-    name='pyuwhoisd',
+    name='uwhois',
     version='0.5',
     author='Raphaël Vinot',
     author_email='raphael.vinot@circl.lu',
