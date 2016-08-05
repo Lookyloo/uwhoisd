@@ -4,46 +4,32 @@ A 'universal' WHOIS proxy server.
 
 import logging
 import logging.config
-import os.path
 import re
 import socket
 import sys
 import time
+import datetime
+import configparser
 
 from uwhoisd import net, utils
+
+import argparse
 
 try:
     import redis
     redis_lib = True
 except ImportError:
-    print('Redis module unavailable, redis cache and rate limiting unavailable')
+    print('Redis module unavailable, redis cache, rate limiting and whowas unavailable')
     redis_lib = False
 
-
-USAGE = "Usage: %s <config>"
+try:
+    from Crypto.Hash import SHA256
+    has_crypto = True
+except ImportError:
+    print('Pycrypto module unavailable, whowas unavailable')
+    has_crypto = False
 
 PORT = socket.getservbyname('whois', 'tcp')
-
-CONFIG = """
-[uwhoisd]
-iface=0.0.0.0
-port=4343
-registry_whois=false
-page_feed=true
-suffix=whois-servers.net
-
-[overrides]
-
-[prefixes]
-
-[recursion_patterns]
-
-[broken]
-
-[ratelimit]
-
-[redis_server]
-"""
 
 logger = logging.getLogger('uwhoisd')
 
@@ -53,40 +39,19 @@ class UWhois(object):
     Universal WHOIS proxy.
     """
 
-    __slots__ = (
-        'conservative',
-        'overrides',
-        'prefixes',
-        'recursion_patterns',
-        'registry_whois',
-        'page_feed',
-        'suffix',
-        'broken',
-        'ratelimit',
-        'redis_server',
-    )
-
-    def __init__(self):
-        super(UWhois, self).__init__()
-        self.suffix = None
-        self.overrides = {}
-        self.prefixes = {}
-        self.recursion_patterns = {}
-        self.broken = {}
-        self.ratelimit = {}
-        self.registry_whois = False
-        self.page_feed = True
-        self.conservative = ()
-        self.redis_server = None
+    def __init__(self, config_path):
+        parser = configparser.SafeConfigParser()
+        parser.read(config_path)
+        self.read_config(parser)
+        self.iface = parser.get('uwhoisd', 'iface')
+        self.port = parser.getint('uwhoisd', 'port')
 
     def _get_dict(self, parser, section):
         """
         Pull a dictionary out of the config safely.
         """
         if parser.has_section(section):
-            values = dict(
-                (key, utils.decode_value(value))
-                for key, value in parser.items(section))
+            values = dict((key, utils.decode_value(value)) for key, value in parser.items(section))
         else:
             values = {}
         setattr(self, section, values)
@@ -97,28 +62,38 @@ class UWhois(object):
         """
         self.registry_whois = utils.to_bool(
             parser.get('uwhoisd', 'registry_whois'))
-        self.page_feed = utils.to_bool(
-            parser.get('uwhoisd', 'page_feed'))
         self.suffix = parser.get('uwhoisd', 'suffix')
-        self.conservative = [
-            zone
-            for zone in parser.get('uwhoisd', 'conservative').split("\n")
-            if zone != '']
+        self.conservative = [zone for zone in parser.get('uwhoisd', 'conservative').split("\n") if zone != '']
 
         for section in ('overrides', 'prefixes', 'broken'):
             self._get_dict(parser, section)
 
-        if utils.to_bool(parser.get('ratelimit', 'enable')) and redis_lib:
+        if redis_lib and utils.to_bool(parser.get('redis_cache', 'enable')):
+            logger.info("Redis caching activated")
+            cache_host = parser.get('redis_cache', 'host')
+            cache_port = parser.getint('redis_cache', 'port')
+            cache_database = parser.getint('redis_cache', 'db')
+            self.cache_expire = parser.getint('redis_cache', 'expire')
+            self.redis_cache = redis.StrictRedis(cache_host, cache_port, cache_database, decode_responses=True)
+
+        if redis_lib and utils.to_bool(parser.get('ratelimit', 'enable')):
+            logger.info("Enable rate limiting.")
             redis_host = parser.get('ratelimit', 'host')
             redis_port = parser.getint('ratelimit', 'port')
             redis_database = parser.getint('ratelimit', 'db')
-            self.redis_server = redis.StrictRedis(redis_host, redis_port, redis_database)
+            self.redis_ratelimit = redis.StrictRedis(redis_host, redis_port, redis_database)
             self._get_dict(parser, 'ratelimit')
 
+        if redis_lib and has_crypto and utils.to_bool(parser.get('whowas', 'enable')):
+            logger.info("Enable WhoWas.")
+            whowas_host = parser.get('whowas', 'host')
+            whowas_port = parser.getint('whowas', 'port')
+            whowas_database = parser.getint('whowas', 'db')
+            self.redis_whowas = redis.StrictRedis(whowas_host, whowas_port, whowas_database)
+
+        self.recursion_patterns = {}
         for zone, pattern in parser.items('recursion_patterns'):
-            self.recursion_patterns[zone] = re.compile(
-                utils.decode_value(pattern),
-                re.I)
+            self.recursion_patterns[zone] = re.compile(utils.decode_value(pattern), re.I)
 
     def get_whois_server(self, zone):
         """
@@ -127,7 +102,7 @@ class UWhois(object):
         if zone in self.overrides:
             server = self.overrides[zone]
         else:
-            server = zone + '.' + self.suffix
+            server = '{}.{}'.format(zone, self.suffix)
         if ':' in server:
             server, port = server.split(':', 1)
             port = int(port)
@@ -175,25 +150,25 @@ class UWhois(object):
         Run the query against a server.
         """
         ratelimit_details = self.ratelimit.get(server)
-        if self.redis_server is not None and ratelimit_details is not None:
-            while self.redis_server.exists(server):
+        if self.redis_ratelimit is not None and ratelimit_details is not None:
+            while self.redis_ratelimit.exists(server):
                 logger.info("Rate limiting on %s (burst)", server)
                 time.sleep(1)
             max_server = int(ratelimit_details.split()[1])
             max_key = server + '_max'
-            while self.redis_server.zcard(max_key) > max_server:
+            while self.redis_ratelimit.zcard(max_key) > max_server:
                 logger.info("Rate limiting on %s", server)
-                self.redis_server.zremrangebyscore(max_key, '-inf', time.time())
+                self.redis_ratelimit.zremrangebyscore(max_key, '-inf', time.time())
                 time.sleep(1)
         client = net.WhoisClient(server, port)
         if is_recursive:
             logger.info("Recursive query to %s about %s", server, query)
         else:
             logger.info("Querying %s about %s", server, query)
-        if self.redis_server is not None and ratelimit_details is not None:
-            self.redis_server.zremrangebyscore(max_key, '-inf', time.time())
-            self.redis_server.setex(server, ratelimit_details.split()[0], '')
-            self.redis_server.zadd(max_key, time.time() + 3600, query)
+        if self.redis_ratelimit is not None and ratelimit_details is not None:
+            self.redis_ratelimit.zremrangebyscore(max_key, '-inf', time.time())
+            self.redis_ratelimit.setex(server, ratelimit_details.split()[0], '')
+            self.redis_ratelimit.zadd(max_key, time.time() + 3600, query)
         if prefix is not None:
             query = '{} {}'.format(prefix, query)
         return client.whois(query)
@@ -218,6 +193,11 @@ class UWhois(object):
         """
         Query the appropriate WHOIS server.
         """
+        if self.redis_cache:
+            response = self.redis_cache.get(query)
+            if response:
+                logger.info("Redis cache hit for %s", query)
+                return response
         # Figure out the zone whose WHOIS server we're meant to be querying.
         zone = self.get_zone(query)
         # Query the registry's WHOIS server.
@@ -229,77 +209,40 @@ class UWhois(object):
         if recursion_pattern is not None:
             response = self._thin_query(recursion_pattern, response, port, query)
 
+        if response:
+            if self.redis_cache:
+                self.redis_cache.setex(query, self.cache_expire, response)
+            if self.redis_whowas:
+                self.store_whois(query, response)
+        else:
+            logger.error("Empty response for %s", query)
+
         if self.broken.get(server) is not None:
             response += self.broken.get(server)
         return response
+
+    def store_whois(self, domain, response):
+        logger.info("Store %s in whowas.", domain)
+        response_hash = SHA256.new(response.lower().encode()).hexdigest()
+        if self.redis_whowas.exists(response_hash):
+            return
+        self.redis_whowas.hset(domain, datetime.date.today().isoformat(), response_hash)
+        self.redis_whowas.set(response_hash, response)
 
 
 def main():
     """
     Execute the daemon.
     """
-    if len(sys.argv) != 2:
-        print(USAGE % os.path.basename(sys.argv[0]), file=sys.stderr)
-        return 1
+    argparser = argparse.ArgumentParser(description='UWhois server')
+    argparser.add_argument('-c', '--config', required=True, help='Path to the config file')
+    args = argparser.parse_args()
 
-    logging.config.fileConfig(sys.argv[1])
+    logging.config.fileConfig(args.config)
 
-    try:
-        logger.info("Reading config file at '%s'", sys.argv[1])
-        parser = utils.make_config_parser(CONFIG, sys.argv[1])
-
-        iface = parser.get('uwhoisd', 'iface')
-        port = parser.getint('uwhoisd', 'port')
-        logger.info("Listen on %s:%d", iface, port)
-
-        uwhois = UWhois()
-        uwhois.read_config(parser)
-        cache = utils.to_bool(parser.get('cache', 'enable'))
-        redis_cache = utils.to_bool(parser.get('redis_cache', 'enable'))
-
-        if cache:
-            logger.info("Caching activated")
-            cache = utils.Cache(
-                max_size=parser.getint('cache', 'max_size'),
-                max_age=parser.getint('cache', 'max_age'))
-
-            def whois(query):
-                """Caching wrapper around UWhois."""
-                cache.evict_expired()
-                if query in cache:
-                    logger.info("Cache hit for %s", query)
-                    response = cache[query]
-                else:
-                    response = uwhois.whois(query)
-                    cache[query] = response
-                return response
-        elif redis_cache and redis_lib:
-            logger.info("Redis caching activated")
-            redis_host = parser.get('redis_cache', 'host')
-            redis_port = parser.getint('redis_cache', 'port')
-            redis_database = parser.getint('redis_cache', 'db')
-            redis_expire = parser.getint('redis_cache', 'expire')
-            redis_cache = redis.StrictRedis(redis_host, redis_port,
-                                            redis_database,
-                                            decode_responses=True)
-
-            def whois(query):
-                """Redis caching wrapper around UWhois."""
-                response = redis_cache.get(query)
-                if response is None:
-                    response = uwhois.whois(query)
-                    redis_cache.setex(query, redis_expire, response)
-                else:
-                    logger.info("Redis cache hit for %s", query)
-                return response
-        else:
-            logger.info("Caching deactivated")
-            whois = uwhois.whois
-    except Exception as ex:  # pylint: disable-msg=W0703
-        print("Could not parse config file: %s" % str(ex), file=sys.stderr)
-        return 1
-    net.start_service(iface, port, whois)
-    return 0
+    logger.info("Reading config file at '%s'", args.config)
+    uwhois = UWhois(args.config)
+    net.start_service(uwhois.iface, uwhois.port, uwhois.whois)
 
 
 if __name__ == '__main__':

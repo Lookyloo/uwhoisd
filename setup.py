@@ -30,7 +30,8 @@ setup(
     ],
     install_requires=[
         'tornado',
-        'redis'
+        'redis',
+        'pycrypto'
     ],
 
     entry_points={

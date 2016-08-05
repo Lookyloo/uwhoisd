@@ -80,6 +80,7 @@ def start_service(iface, port, whois):
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
     server = WhoisListener(whois)
+    logger.info("Listen on %s:%d", iface, port)
     server.bind(port, iface)
     server.start(None)
     IOLoop.instance().start()
