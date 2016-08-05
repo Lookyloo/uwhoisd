@@ -222,10 +222,10 @@ class UWhois(object):
         return response
 
     def store_whois(self, domain, response):
-        logger.info("Store %s in whowas.", domain)
         response_hash = SHA256.new(response.lower().encode()).hexdigest()
         if self.redis_whowas.exists(response_hash):
             return
+        logger.info("Store %s in whowas.", domain)
         self.redis_whowas.hset(domain, datetime.date.today().isoformat(), response_hash)
         self.redis_whowas.set(response_hash, response)
 
