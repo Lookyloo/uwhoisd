@@ -225,9 +225,10 @@ class UWhois(object):
         response_hash = SHA256.new(response.lower().encode()).hexdigest()
         if self.redis_whowas.exists(response_hash):
             return
-        logger.info("Store %s in whowas.", domain)
-        self.redis_whowas.hset(domain, datetime.date.today().isoformat(), response_hash)
-        self.redis_whowas.set(response_hash, response)
+        # only store if the value hasn't been set today.
+        if self.redis_whowas.hsetnx(domain, datetime.date.today().isoformat(), response_hash):
+            logger.info("Store %s in whowas.", domain)
+            self.redis_whowas.set(response_hash, response)
 
 
 def main():
