@@ -22,7 +22,7 @@ install:
   - popd
 
 script:
-  - coverage run --parallel-mode --source=uwhoisd uwhoisd/__init__.py extra/uwhoisd.ini &
+  - coverage run --parallel-mode --source=uwhoisd uwhoisd/__init__.py -c extra/uwhoisd.ini &
   - pid=$!
   - sleep 5
   - nosetests --with-coverage --cover-package=uwhoisd

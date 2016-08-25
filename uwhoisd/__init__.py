@@ -89,7 +89,7 @@ class UWhois(object):
             whowas_host = parser.get('whowas', 'host')
             whowas_port = parser.getint('whowas', 'port')
             whowas_database = parser.getint('whowas', 'db')
-            self.redis_whowas = redis.StrictRedis(whowas_host, whowas_port, whowas_database, decode_response=True)
+            self.redis_whowas = redis.StrictRedis(whowas_host, whowas_port, whowas_database, decode_responses=True)
 
         self.recursion_patterns = {}
         for zone, pattern in parser.items('recursion_patterns'):
