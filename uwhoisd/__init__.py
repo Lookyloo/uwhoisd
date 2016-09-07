@@ -160,18 +160,18 @@ class UWhois(object):
                 logger.info("Rate limiting on %s", server)
                 self.redis_ratelimit.zremrangebyscore(max_key, '-inf', time.time())
                 time.sleep(1)
-        client = net.WhoisClient(server, port)
-        if is_recursive:
-            logger.info("Recursive query to %s about %s", server, query)
-        else:
-            logger.info("Querying %s about %s", server, query)
-        if self.redis_ratelimit is not None and ratelimit_details is not None:
-            self.redis_ratelimit.zremrangebyscore(max_key, '-inf', time.time())
-            self.redis_ratelimit.setex(server, ratelimit_details.split()[0], '')
-            self.redis_ratelimit.zadd(max_key, time.time() + 3600, query)
-        if prefix is not None:
-            query = '{} {}'.format(prefix, query)
-        return client.whois(query)
+        with net.WhoisClient(server, port) as client:
+            if is_recursive:
+                logger.info("Recursive query to %s about %s", server, query)
+            else:
+                logger.info("Querying %s about %s", server, query)
+            if self.redis_ratelimit is not None and ratelimit_details is not None:
+                self.redis_ratelimit.zremrangebyscore(max_key, '-inf', time.time())
+                self.redis_ratelimit.setex(server, ratelimit_details.split()[0], '')
+                self.redis_ratelimit.zadd(max_key, time.time() + 3600, query)
+            if prefix is not None:
+                query = '{} {}'.format(prefix, query)
+            return client.whois(query)
 
     def _thin_query(self, pattern, response, port, query):
         """
