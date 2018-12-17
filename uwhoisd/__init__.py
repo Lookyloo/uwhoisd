@@ -162,7 +162,7 @@ class UWhois(object):
             if self.redis_ratelimit is not None and ratelimit_details is not None:
                 self.redis_ratelimit.zremrangebyscore(max_key, '-inf', time.time())
                 self.redis_ratelimit.setex(server, ratelimit_details.split()[0], '')
-                self.redis_ratelimit.zadd(max_key, time.time() + 3600, query)
+                self.redis_ratelimit.zadd(max_key, {query, time.time() + 3600})
             if prefix is not None:
                 query = '{} {}'.format(prefix, query)
             return client.whois(query)
