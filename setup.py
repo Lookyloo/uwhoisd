@@ -30,8 +30,7 @@ setup(
     ],
     install_requires=[
         'tornado',
-        'redis',
-        'pycrypto'
+        'redis>=3'
     ],
 
     entry_points={
@@ -39,6 +38,8 @@ setup(
             'uwhoisd = uwhoisd:main',
         ),
     },
+
+    scripts=['bin/run_backend.py', 'bin/start.py'],
 
     classifiers=(
         'Development Status :: 2 - Pre-Alpha',

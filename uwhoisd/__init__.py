@@ -10,6 +10,8 @@ import sys
 import time
 import datetime
 import configparser
+import hashlib
+from .helpers import set_running, unset_running, get_socket_path
 
 from uwhoisd import net, utils
 
@@ -21,13 +23,6 @@ try:
 except ImportError:
     print('Redis module unavailable, redis cache, rate limiting and whowas unavailable')
     redis_lib = False
-
-try:
-    from Crypto.Hash import SHA256
-    has_crypto = True
-except ImportError:
-    print('Pycrypto module unavailable, whowas unavailable')
-    has_crypto = False
 
 PORT = socket.getservbyname('whois', 'tcp')
 
@@ -70,26 +65,25 @@ class UWhois(object):
 
         if redis_lib and utils.to_bool(parser.get('redis_cache', 'enable')):
             logger.info("Redis caching activated")
-            cache_host = parser.get('redis_cache', 'host')
-            cache_port = parser.getint('redis_cache', 'port')
+            cache_socket = get_socket_path('cache')
             cache_database = parser.getint('redis_cache', 'db')
             self.cache_expire = parser.getint('redis_cache', 'expire')
-            self.redis_cache = redis.StrictRedis(cache_host, cache_port, cache_database, decode_responses=True)
+            self.redis_cache = redis.StrictRedis(unix_socket_path=cache_socket, db=cache_database,
+                                                 decode_responses=True)
 
         if redis_lib and utils.to_bool(parser.get('ratelimit', 'enable')):
             logger.info("Enable rate limiting.")
-            redis_host = parser.get('ratelimit', 'host')
-            redis_port = parser.getint('ratelimit', 'port')
+            cache_socket = get_socket_path('cache')
             redis_database = parser.getint('ratelimit', 'db')
-            self.redis_ratelimit = redis.StrictRedis(redis_host, redis_port, redis_database)
+            self.redis_ratelimit = redis.StrictRedis(unix_socket_path=str(cache_socket), db=redis_database)
             self._get_dict(parser, 'ratelimit')
 
-        if redis_lib and has_crypto and utils.to_bool(parser.get('whowas', 'enable')):
+        if redis_lib and utils.to_bool(parser.get('whowas', 'enable')):
             logger.info("Enable WhoWas.")
-            whowas_host = parser.get('whowas', 'host')
-            whowas_port = parser.getint('whowas', 'port')
+            whowas_socket = get_socket_path('whowas')
             whowas_database = parser.getint('whowas', 'db')
-            self.redis_whowas = redis.StrictRedis(whowas_host, whowas_port, whowas_database, decode_responses=True)
+            self.redis_whowas = redis.StrictRedis(unix_socket_path=str(whowas_socket), db=whowas_database,
+                                                  decode_responses=True)
 
         self.recursion_patterns = {}
         for zone, pattern in parser.items('recursion_patterns'):
@@ -222,7 +216,7 @@ class UWhois(object):
         return response
 
     def store_whois(self, domain, response):
-        response_hash = SHA256.new(response.lower().encode()).hexdigest()
+        response_hash = hashlib.sha256(response.lower().encode()).hexdigest()
         if self.redis_whowas.exists(response_hash):
             return
         # only store if the value hasn't been set today.
@@ -243,7 +237,9 @@ def main():
 
     logger.info("Reading config file at '%s'", args.config)
     uwhois = UWhois(args.config)
+    set_running('uwhoisd')
     net.start_service(uwhois.iface, uwhois.port, uwhois.whois)
+    unset_running('uwhoisd')
 
 
 if __name__ == '__main__':

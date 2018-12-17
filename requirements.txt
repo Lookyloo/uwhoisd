@@ -1,2 +1,2 @@
-redis
+redis>=3
 tornado

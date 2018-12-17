@@ -2,10 +2,10 @@
 A scraper which pulls zone WHOIS servers from IANA's root zone database.
 """
 
-import csv
+from csv import DictReader
 import logging
 import socket
-import io
+from io import StringIO
 import sys
 import time
 import urllib.parse
@@ -22,20 +22,17 @@ IP_ASSIGNATIONS = 'https://www.iana.org/assignments/ipv4-address-space/ipv4-addr
 def ip_assignations():
     logging.info("Scraping %s", IP_ASSIGNATIONS)
     assignations = requests.get(IP_ASSIGNATIONS).text
-    print(assignations)
-    reader = csv.reader(io.StringIO(assignations))
-    next(reader, None)
     no_server = []
-    for p, designation, date, whois_server, status, note in reader:
-        prefix = int(p[0:3])
-        if whois_server == '':
+    for row in DictReader(StringIO(assignations)):
+        prefix = int(row['Prefix'][0:3])
+        if not row['WHOIS']:
             logging.info("No WHOIS server found for %s", prefix)
             no_server.append(prefix)
         else:
-            logging.info("WHOIS server for %s is %s", prefix, whois_server)
-            print('%s=%s' % (prefix, whois_server))
+            logging.info("WHOIS server for %s is %s", prefix, row['WHOIS'])
+            print(f"{prefix}={row['WHOIS']}")
     for prefix in no_server:
-        print('; No record for %s' % prefix)
+        print(f'; No record for {prefix}')
 
 
 def main():
@@ -110,4 +107,5 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    #sys.exit(main())
+    sys.exit(ip_assignations())
