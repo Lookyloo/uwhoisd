@@ -96,7 +96,7 @@ class UWhois(object):
         if zone in self.overrides:
             server = self.overrides[zone]
         else:
-            server = '{}.{}'.format(zone, self.suffix)
+            server = f'{zone}.{self.suffix}'
         if ':' in server:
             server, port = server.split(':', 1)
             port = int(port)
@@ -144,27 +144,37 @@ class UWhois(object):
         Run the query against a server.
         """
         ratelimit_details = self.ratelimit.get(server)
+        if ratelimit_details:
+            per_sec, per_hour = ratelimit_details.split()
+            key_burst = f'{server}_burst'
+            key_normal = f'{server}_normal'
         if self.redis_ratelimit is not None and ratelimit_details is not None:
-            while self.redis_ratelimit.exists(server):
-                logger.info("Rate limiting on %s (burst)", server)
+            while self.redis_ratelimit.zcard(key_burst) > int(per_sec):
+                # Max queries per sec reached
+                logger.info(f"Rate limiting on {server} (burst)")
+                time.sleep(.3)
+                # Remove all the keys that are at least 1 sec old
+                self.redis_ratelimit.zremrangebyscore(key_burst, '-inf', time.time() - 1)
+            while self.redis_ratelimit.zcard(key_normal) > int(per_hour):
+                # Max queries per hour reached
+                logger.info(f"Rate limiting on {server}")
                 time.sleep(1)
-            max_server = int(ratelimit_details.split()[1])
-            max_key = server + '_max'
-            while self.redis_ratelimit.zcard(max_key) > max_server:
-                logger.info("Rate limiting on %s", server)
-                self.redis_ratelimit.zremrangebyscore(max_key, '-inf', time.time())
-                time.sleep(1)
+                # Remove all the keys that are at least 1 hour old
+                self.redis_ratelimit.zremrangebyscore(key_normal, '-inf', time.time() - 3600)
         with net.WhoisClient(server, port) as client:
             if is_recursive:
-                logger.info("Recursive query to %s about %s", server, query)
+                logger.info(f"Recursive query to {server} about {query}")
             else:
-                logger.info("Querying %s about %s", server, query)
+                logger.info(f"Querying {server} about {query}")
             if self.redis_ratelimit is not None and ratelimit_details is not None:
-                self.redis_ratelimit.zremrangebyscore(max_key, '-inf', time.time())
-                self.redis_ratelimit.setex(server, ratelimit_details.split()[0], '')
-                self.redis_ratelimit.zadd(max_key, {query, time.time() + 3600})
+                pipeline = self.redis_ratelimit.pipeline(False)
+                pipeline.zadd(key_burst, {query: int(time.time())})
+                pipeline.expire(key_burst, 1)
+                pipeline.zadd(key_normal, {query: int(time.time())})
+                pipeline.expire(key_normal, 3600)
+                pipeline.execute()
             if prefix is not None:
-                query = '{} {}'.format(prefix, query)
+                query = f'{prefix} {query}'
             return client.whois(query)
 
     def _thin_query(self, pattern, response, port, query):
@@ -190,7 +200,7 @@ class UWhois(object):
         if self.redis_cache:
             response = self.redis_cache.get(query)
             if response:
-                logger.info("Redis cache hit for %s", query)
+                logger.info(f"Redis cache hit for {query}")
                 return response
         # Figure out the zone whose WHOIS server we're meant to be querying.
         zone = self.get_zone(query)
@@ -209,7 +219,7 @@ class UWhois(object):
             if self.redis_whowas:
                 self.store_whois(query, response)
         else:
-            logger.error("Empty response for %s", query)
+            logger.error(f"Empty response for {query}")
 
         if self.broken.get(server) is not None:
             response += self.broken.get(server)
@@ -221,7 +231,7 @@ class UWhois(object):
             return
         # only store if the value hasn't been set today.
         if self.redis_whowas.hsetnx(domain, datetime.date.today().isoformat(), response_hash):
-            logger.info("Store %s in whowas.", domain)
+            logger.info(f"Store {domain} in whowas.")
             self.redis_whowas.set(response_hash, response)
 
 
@@ -235,7 +245,7 @@ def main():
 
     logging.config.fileConfig(args.config)
 
-    logger.info("Reading config file at '%s'", args.config)
+    logger.info(f"Reading config file at '{args.config}'")
     uwhois = UWhois(args.config)
     set_running('uwhoisd')
     net.start_service(uwhois.iface, uwhois.port, uwhois.whois)
