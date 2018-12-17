@@ -6,17 +6,15 @@ services:
   - redis-server
 
 python:
-  - "3.3"
-  - "3.4"
-  - "3.5"
-  - "3.5-dev"
+  - '3.6'
+  - '3.6-dev'
+  - '3.7-dev'
   - "nightly"
 
 install:
-  - pip install coveralls
-  - pip install codecov
+  - pip install coveralls codecov
+  - pip install -r requirements.txt
   - pip install .
-  - cp travis_config/uwhoisd.ini extra/uwhoisd.ini
   - pushd client
   - pip install .
   - popd
