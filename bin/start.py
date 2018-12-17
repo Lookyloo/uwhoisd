@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from subprocess import Popen
-from ipasnhistory.libs.helpers import get_homedir
+from uwhoisd.helpers import get_homedir
 
 if __name__ == '__main__':
     # Just fail if the env isn't set.
