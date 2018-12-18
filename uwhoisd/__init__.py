@@ -193,7 +193,7 @@ class UWhois(object):
             try:
                 response += self._run_query(server, port, query, prefix, True)
             except socket.gaierror:
-                logger.exception('The whois query failed.')
+                logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
         return response
 
     def whois(self, query):
@@ -213,7 +213,7 @@ class UWhois(object):
         try:
             response = self._run_query(server, port, query, prefix)
         except socket.gaierror:
-            logger.exception('The whois query failed.')
+            logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
 
         # Thin registry? Query the registrar's WHOIS server.
         recursion_pattern = self.get_recursion_pattern(server)
