@@ -192,6 +192,8 @@ class UWhois(object):
                 response += "\f"
             try:
                 response += self._run_query(server, port, query, prefix, True)
+            except TimeoutError:
+                logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
             except socket.gaierror:
                 logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
         return response
@@ -212,6 +214,8 @@ class UWhois(object):
         prefix = self.get_prefix(server)
         try:
             response = self._run_query(server, port, query, prefix)
+        except TimeoutError:
+            logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
         except socket.gaierror:
             logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
 
