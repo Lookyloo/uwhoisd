@@ -190,7 +190,10 @@ class UWhois(object):
             elif self.page_feed:
                 # A form feed character so it's possible to find the split.
                 response += "\f"
-            response += self._run_query(server, port, query, prefix, True)
+            try:
+                response += self._run_query(server, port, query, prefix, True)
+            except socket.gaierror:
+                logger.exception('The whois query failed.')
         return response
 
     def whois(self, query):
@@ -207,7 +210,11 @@ class UWhois(object):
         # Query the registry's WHOIS server.
         server, port = self.get_whois_server(zone)
         prefix = self.get_prefix(server)
-        response = self._run_query(server, port, query, prefix)
+        try:
+            response = self._run_query(server, port, query, prefix)
+        except socket.gaierror:
+            logger.exception('The whois query failed.')
+
         # Thin registry? Query the registrar's WHOIS server.
         recursion_pattern = self.get_recursion_pattern(server)
         if recursion_pattern is not None:
