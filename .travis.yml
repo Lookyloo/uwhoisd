@@ -2,9 +2,6 @@ language: python
 
 cache: pip
 
-services:
-  - redis-server
-
 python:
   - '3.6'
   - '3.6-dev'
@@ -14,12 +11,19 @@ python:
 install:
   - pip install coveralls codecov
   - pip install -r requirements.txt
-  - pip install .
+  - pip install -e .
   - pushd client
-  - pip install .
+  - pip install -e .
   - popd
+  - cd ..
+  - git clone https://github.com/antirez/redis.git
+  - cd redis
+  - make
+  - cd $TRAVIS_BUILD_DIR
 
 script:
+  - export UWHOISD_HOME=$TRAVIS_BUILD_DIR
+  - run_backend.py --start
   - uwhoisd -c extra/uwhoisd.ini &
   - pid=$!
   - sleep 5
