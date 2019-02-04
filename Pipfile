@@ -4,7 +4,6 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-uwhoisd = {editable = true,file = "file:///home/raphael/gits/uwhoisd"}
 coverage = "*"
 nose = "*"
 Sphinx = "*"
@@ -13,6 +12,7 @@ Sphinx = "*"
 redis = ">=3"
 tornado = "*"
 uwhoisd = {editable = true,path = "."}
+uwhois = {editable = true,path = "./client"}
 
 [requires]
 python_version = "3.6"

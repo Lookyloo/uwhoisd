@@ -1,4 +1,0 @@
--i https://pypi.org/simple
--e .
-redis==3.0.1
-tornado==5.1.1

@@ -9,22 +9,19 @@ python:
   - "nightly"
 
 install:
-  - pip install coveralls codecov
-  - pip install -r requirements.txt
-  - pip install -e .
-  - pushd client
-  - pip install -e .
-  - popd
-  - cd ..
+  - pip install pipenv
+  # install redis
+  - pushd ..
   - git clone https://github.com/antirez/redis.git
-  - cd redis
+  - pushd redis
   - make
-  - cd $TRAVIS_BUILD_DIR
+  - popd
+  - popd
+  - pipenv install -d
+  - echo UWHOISD_HOME="'`pwd`'" > .env
 
 script:
-  - export UWHOISD_HOME=$TRAVIS_BUILD_DIR
-  - run_backend.py --start
-  - uwhoisd -c extra/uwhoisd.ini &
+  - pipenv run start.py
   - pid=$!
   - sleep 5
   - nosetests --with-coverage --cover-package=uwhoisd
