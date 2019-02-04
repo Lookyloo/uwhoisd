@@ -22,10 +22,8 @@ install:
 
 script:
   - pipenv run start.py
-  - pid=$!
   - sleep 5
   - nosetests --with-coverage --cover-package=uwhoisd
-  - kill -s INT $pid
   - coverage combine .coverage*
 
 after_success:
