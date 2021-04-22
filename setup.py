@@ -18,7 +18,7 @@ setup(
     name='uwhoisd',
     version='0.0.7',
     description="Universal domain WHOIS proxy server.",
-    long_description=read('README') + "\n\n" + read("ChangeLog"),
+    long_description=read('README.md') + "\n\n" + read("ChangeLog"),
     url='https://github.com/kgaughan/uwhoisd/',
     license='MIT',
     packages=find_packages(exclude=['tests']),

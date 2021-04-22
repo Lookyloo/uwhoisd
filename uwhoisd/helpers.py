@@ -9,6 +9,7 @@ from redis.exceptions import ConnectionError
 from datetime import datetime, timedelta
 import time
 import asyncio
+from functools import lru_cache
 
 
 def get_storage_path() -> Path:
@@ -17,7 +18,18 @@ def get_storage_path() -> Path:
     return Path(os.environ['VIRTUAL_ENV'])
 
 
+@lru_cache(64)
 def get_homedir() -> Path:
+    if not os.environ.get('UWHOISD_HOME'):
+        # Try to open a .env file in the home directory if it exists.
+        if (Path(__file__).resolve().parent.parent / '.env').exists():
+            with (Path(__file__).resolve().parent.parent / '.env').open() as f:
+                for line in f:
+                    key, value = line.strip().split('=', 1)
+                    if value[0] in ['"', "'"]:
+                        value = value[1:-1]
+                    os.environ[key] = value
+
     if not os.environ.get('UWHOISD_HOME'):
         guessed_home = Path(__file__).resolve().parent.parent
         raise MissingEnv(f"UWHOISD_HOME is missing. \

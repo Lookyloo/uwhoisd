@@ -17,22 +17,6 @@ def is_well_formed_fqdn(fqdn):
     return FQDN_PATTERN.match(fqdn) is not None
 
 
-def split_fqdn(fqdn):
-    """
-    Splits an FQDN into the domain name and zone.
-
-    >>> split_fqdn('stereochro.me')
-    ['stereochro', 'me']
-    >>> split_fqdn('stereochro.me.')
-    ['stereochro', 'me']
-    >>> split_fqdn('stereochrome')
-    ['stereochrome']
-    >>> split_fqdn('keithgaughan.co.uk')
-    ['keithgaughan', 'co.uk']
-    """
-    return fqdn.rstrip('.').split('.', 1)
-
-
 def to_bool(s):
     """
     Converts the given string to a boolean.

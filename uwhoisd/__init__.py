@@ -7,26 +7,39 @@ import logging.config
 import re
 import socket
 import sys
+import shlex
+from subprocess import Popen, PIPE
 import time
 import datetime
 import configparser
 import hashlib
-from .helpers import set_running, unset_running, get_socket_path
-
-from uwhoisd import net, utils
-
 import argparse
 
+from publicsuffix2 import PublicSuffixList, fetch  # type: ignore
+
+from . import net, utils
+from .helpers import set_running, unset_running, get_socket_path
+
+
+logger = logging.getLogger('uwhoisd')
 try:
     import redis
     redis_lib = True
 except ImportError:
-    print('Redis module unavailable, redis cache, rate limiting and whowas unavailable')
+    logger.warning('Redis module unavailable, redis cache, rate limiting and whowas unavailable')
     redis_lib = False
 
-PORT = socket.getservbyname('whois', 'tcp')
 
-logger = logging.getLogger('uwhoisd')
+# Initialize Public Suffix List
+try:
+    psl_file = fetch()
+    psl = PublicSuffixList(psl_file=psl_file)
+except Exception as e:
+    logger.warning(f'Unable to fetch the PublicSuffixList: {e}')
+    psl = PublicSuffixList()
+
+
+PORT = socket.getservbyname('whois', 'tcp')
 
 
 class UWhois(object):
@@ -35,7 +48,7 @@ class UWhois(object):
     """
 
     def __init__(self, config_path):
-        parser = configparser.SafeConfigParser()
+        parser = configparser.ConfigParser()
         parser.read(config_path)
         self.read_config(parser)
         self.iface = parser.get('uwhoisd', 'iface')
@@ -55,12 +68,10 @@ class UWhois(object):
         """
         Read the configuration for this object from a config file.
         """
-        self.registry_whois = utils.to_bool(
-            parser.get('uwhoisd', 'registry_whois'))
-        self.suffix = parser.get('uwhoisd', 'suffix')
-        self.conservative = [zone for zone in parser.get('uwhoisd', 'conservative').split("\n") if zone != '']
+        self.registry_whois = parser.getboolean('uwhoisd', 'registry_whois')
+        self.page_feed = parser.getboolean('uwhoisd', 'page_feed')
 
-        for section in ('overrides', 'prefixes', 'broken'):
+        for section in ('overrides', 'prefixes', 'broken', 'tld_no_whois'):
             self._get_dict(parser, section)
 
         if redis_lib and utils.to_bool(parser.get('redis_cache', 'enable')):
@@ -89,14 +100,11 @@ class UWhois(object):
         for zone, pattern in parser.items('recursion_patterns'):
             self.recursion_patterns[zone] = re.compile(utils.decode_value(pattern), re.I)
 
-    def get_whois_server(self, zone):
+    def get_overwritten_whois_server(self, zone):
         """
         Get the WHOIS server for the given zone.
         """
-        if zone in self.overrides:
-            server = self.overrides[zone]
-        else:
-            server = f'{zone}.{self.suffix}'
+        server = self.overrides[zone]
         if ':' in server:
             server, port = server.split(':', 1)
             port = int(port)
@@ -122,22 +130,6 @@ class UWhois(object):
         Get the recursion pattern after querying a server.
         """
         return self.recursion_patterns.get(server)
-
-    def get_zone(self, query):
-        """
-        Get the zone of a query.
-        """
-        for zone in self.conservative:
-            if query.endswith('.' + zone):
-                break
-        else:
-            if query.split('.')[-1].isdigit():
-                zone = query.split('.')[0]
-            elif ':' in query:
-                zone = 'ipv6'
-            else:
-                _, zone = utils.split_fqdn(query)
-        return zone
 
     def _run_query(self, server, port, query, prefix='', is_recursive=False):
         """
@@ -198,31 +190,66 @@ class UWhois(object):
                 logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
         return response
 
+    def _strip_hostname(self, query):
+        """A whois query on a hostname will fail. This method uses the Mozilla TLD list
+        to only keep the domain part and remove everything else."""
+        tld = psl.get_tld(query, strict=True)
+        hostname = query.rstrip(f'.{tld}')
+        if '.' in hostname:
+            domain = hostname.split('.')[-1]
+            return f'{domain}.{tld}', tld
+        return query, tld
+
     def whois(self, query):
         """
         Query the appropriate WHOIS server.
         """
+        if query.split('.')[-1].isdigit():
+            # IPv4, doesn't matter, always fallback to system whois
+            zone = 'ipv4'
+        elif ':' in query:
+            # IPv6, doesn't matter, always fallback to system whois
+            zone = 'ipv6'
+        else:
+            # Domain, strip hostname part if needed
+            query, zone = self._strip_hostname(query)
+
         if self.redis_cache:
             response = self.redis_cache.get(query)
             if response:
                 logger.info(f"Redis cache hit for {query}")
                 return response
-        # Figure out the zone whose WHOIS server we're meant to be querying.
-        zone = self.get_zone(query)
-        # Query the registry's WHOIS server.
-        server, port = self.get_whois_server(zone)
-        prefix = self.get_prefix(server)
-        try:
-            response = self._run_query(server, port, query, prefix)
-        except TimeoutError:
-            logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
-        except socket.gaierror:
-            logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
 
-        # Thin registry? Query the registrar's WHOIS server.
-        recursion_pattern = self.get_recursion_pattern(server)
-        if recursion_pattern is not None:
-            response = self._thin_query(recursion_pattern, response, port, query)
+        if zone in self.overrides:
+            server, port = self.get_overwritten_whois_server(zone)
+            # Query the registry's WHOIS server.
+            prefix = self.get_prefix(server)
+            try:
+                response = self._run_query(server, port, query, prefix)
+            except TimeoutError:
+                logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
+            except socket.gaierror:
+                logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
+
+            # Thin registry? Query the registrar's WHOIS server.
+            recursion_pattern = self.get_recursion_pattern(server)
+            if recursion_pattern is not None:
+                response = self._thin_query(recursion_pattern, response, port, query)
+
+        else:
+            # Just use the system whois command
+            command = shlex.split(f'whois --verbose {query}')
+            proc = Popen(command, stdout=PIPE, stderr=PIPE)
+            out, err = proc.communicate()
+            try:
+                s, _, response = out.decode().strip().split('\n', 2)
+                server = re.findall('Using server (.*).', s)[0]
+                logger.info(f'Queried {server} about {query}')
+            except Exception as e:
+                logger.warning(f'Error with query "{query}": {e}')
+                logger.warning(f'Response: {out}')
+                server = None
+                response = out.decode()
 
         if response:
             if self.redis_cache:
@@ -232,8 +259,10 @@ class UWhois(object):
         else:
             logger.error(f"Empty response for {query}")
 
-        if self.broken.get(server) is not None:
-            response += self.broken.get(server)
+        if server and self.broken.get(server) is not None:
+            response += '\n' + self.broken.get(server)
+        elif self.tld_no_whois.get(zone) is not None:
+            response += '\n' + self.tld_no_whois.get(zone)
         return response
 
     def store_whois(self, domain, response):

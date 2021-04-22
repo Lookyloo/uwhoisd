@@ -10,10 +10,13 @@ import time
 
 import tornado
 from tornado import gen
-from tornado.ioloop import IOLoop
+from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.tcpserver import TCPServer
 
+
 from uwhoisd import utils
+
+from uwhoisd.helpers import shutdown_requested
 
 
 logger = logging.getLogger('uwhoisd')
@@ -132,11 +135,11 @@ class ClientHandler(object):
         """
         try:
             with auto_timeout(self, self.timeout):
-                self.data = yield self.stream.read_until_regex(b'\s')
+                self.data = yield self.stream.read_until_regex(br'\s')
             if self._timed_out:
                 return
             whois_query = self.data.decode().strip().lower()
-            if not utils.is_well_formed_fqdn(whois_query):
+            if not utils.is_well_formed_fqdn(whois_query) and ':' not in whois_query:
                 whois_entry = "; Bad request: '{0}'\r\n".format(whois_query)
             else:
                 whois_entry = self.query_fct(whois_query)
@@ -178,6 +181,12 @@ class WhoisListener(TCPServer):
             stream.close()
 
 
+class ShutdownCallback(PeriodicCallback):
+
+    def stop(self):
+        self.io_loop.stop()
+
+
 def start_service(iface, port, whois):
     """
     Start the service.
@@ -188,5 +197,12 @@ def start_service(iface, port, whois):
     logger.info("Listen on %s:%d", iface, port)
     server.bind(port, iface)
     server.start(None)
+
+    def callback():
+        if shutdown_requested():
+            pc.stop()
+
+    pc = ShutdownCallback(callback, 3000)
+    pc.start()
     IOLoop.instance().start()
     IOLoop.instance().close()
