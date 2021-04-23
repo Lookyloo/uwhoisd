@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "uwhoisd"
-version = "0.0.7"
+version = "0.1.0"
 description = "Universal domain WHOIS proxy server."
 authors = ["Raphaël Vinot <raphael@vinot.info>"]
 license = "MIT"

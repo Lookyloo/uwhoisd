@@ -42,6 +42,3 @@ jobs:
       run: |
         poetry run start
         sleep 10
-        poetry run stop
-
-
