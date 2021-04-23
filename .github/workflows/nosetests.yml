@@ -13,6 +13,7 @@ jobs:
     strategy:
       matrix:
         python-version: [3.8, 3.9]
+        fail-fast: false
 
     steps:
     - uses: actions/checkout@v2
@@ -33,6 +34,10 @@ jobs:
         poetry install
         echo UWHOISD_HOME="'`pwd`'" > .env
 
+    - name: Run mypy
+      run: |
+        poetry run mypy .
+
     - name: Run uwhoisd
       run: |
         poetry run start
@@ -40,6 +45,3 @@ jobs:
         poetry run stop
 
 
-    - name: Run mypy
-      run: |
-        poetry run mypy .
