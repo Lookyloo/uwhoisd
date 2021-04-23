@@ -35,7 +35,7 @@ jobs:
 
     - name: Run uwhoisd
       run: |
-        pipenv run start
+        poetry run start
         sleep 10
         poetry run nosetests --with-coverage --cover-package=uwhoisd
         pipenv run stop
