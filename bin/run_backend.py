@@ -5,47 +5,48 @@ from uwhoisd.helpers import get_homedir, check_running
 from subprocess import Popen
 import time
 from pathlib import Path
+from typing import Optional, List, Union
 
 import argparse
 
 
-def launch_cache(storage_directory: Path=None):
+def launch_cache(storage_directory: Optional[Path]=None) -> None:
     if not storage_directory:
         storage_directory = get_homedir()
     if not check_running('cache'):
         Popen(["./run_redis.sh"], cwd=(storage_directory / 'cache'))
 
 
-def shutdown_cache(storage_directory: Path=None):
+def shutdown_cache(storage_directory: Optional[Path]=None) -> None:
     if not storage_directory:
         storage_directory = get_homedir()
     Popen(["./shutdown_redis.sh"], cwd=(storage_directory / 'cache'))
 
 
-def launch_whowas(storage_directory: Path=None):
+def launch_whowas(storage_directory: Optional[Path]=None) -> None:
     if not storage_directory:
         storage_directory = get_homedir()
     if not check_running('whowas'):
         Popen(["./run_redis.sh"], cwd=(storage_directory / 'whowas'))
 
 
-def shutdown_whowas(storage_directory: Path=None):
+def shutdown_whowas(storage_directory: Optional[Path]=None) -> None:
     if not storage_directory:
         storage_directory = get_homedir()
     Popen(["./shutdown_redis.sh"], cwd=(storage_directory / 'whowas'))
 
 
-def launch_all():
+def launch_all() -> None:
     launch_cache()
     launch_whowas()
 
 
-def check_all(stop=False):
-    backends = [['cache', False], ['whowas', False]]
+def check_all(stop: bool=False) -> None:
+    backends: List[List[Union[str, bool]]] = [['cache', False], ['whowas', False]]
     while True:
         for b in backends:
             try:
-                b[1] = check_running(b[0])
+                b[1] = check_running(b[0])  # type: ignore
             except Exception:
                 b[1] = False
         if stop:
@@ -62,12 +63,12 @@ def check_all(stop=False):
         time.sleep(1)
 
 
-def stop_all():
+def stop_all() -> None:
     shutdown_cache()
     shutdown_whowas()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description='Manage backend DBs.')
     parser.add_argument("--start", action='store_true', default=False, help="Start all")
     parser.add_argument("--stop", action='store_true', default=False, help="Stop all")

@@ -11,6 +11,7 @@ import time
 import asyncio
 from functools import lru_cache
 
+from typing import Dict
 
 def get_storage_path() -> Path:
     if not os.environ.get('VIRTUAL_ENV'):
@@ -54,7 +55,7 @@ def unset_running(name: str) -> None:
     r.hdel('running', name)
 
 
-def is_running() -> dict:
+def is_running() -> Dict[str, str]:
     r = Redis(unix_socket_path=get_socket_path('cache'), db=2, decode_responses=True)
     return r.hgetall('running')
 
@@ -69,11 +70,9 @@ def get_socket_path(name: str) -> str:
 
 def check_running(name: str) -> bool:
     socket_path = get_socket_path(name)
-    print(socket_path)
     try:
         r = Redis(unix_socket_path=socket_path)
-        if r.ping():
-            return True
+        return True if r.ping() else False
     except ConnectionError:
         return False
 
@@ -81,7 +80,7 @@ def check_running(name: str) -> bool:
 def shutdown_requested() -> bool:
     try:
         r = Redis(unix_socket_path=get_socket_path('cache'), db=2, decode_responses=True)
-        return r.exists('shutdown')
+        return True if r.exists('shutdown') else False
     except ConnectionRefusedError:
         return True
     except ConnectionError:

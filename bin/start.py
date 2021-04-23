@@ -5,7 +5,7 @@ from subprocess import Popen
 from uwhoisd.helpers import get_homedir
 
 
-def main():
+def main() -> None:
     # Just fail if the env isn't set.
     get_homedir()
     p = Popen(['run_backend', '--start'])

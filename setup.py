@@ -4,10 +4,10 @@ from __future__ import with_statement
 
 import os.path
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages  # type: ignore
 
 
-def read(filename):
+def read(filename: str) -> str:
     """Read files relative to this file."""
     full_path = os.path.join(os.path.dirname(__file__), filename)
     with open(full_path, 'r') as fh:

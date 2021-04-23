@@ -7,6 +7,7 @@ import logging
 import signal
 import socket
 import time
+from typing import Callable
 
 import tornado
 from tornado import gen
@@ -22,7 +23,7 @@ from uwhoisd.helpers import shutdown_requested
 logger = logging.getLogger('uwhoisd')
 
 
-def handle_signal(sig, frame):
+def handle_signal(sig, frame) -> None:  # type: ignore
     """
     Stop the main loop on signal.
     """
@@ -34,7 +35,7 @@ class WhoisClient(object):
     Whois client.
     """
 
-    def __init__(self, server, port):
+    def __init__(self, server: str, port: int) -> None:
         """
         A WHOIS client for Tornado.
 
@@ -44,7 +45,7 @@ class WhoisClient(object):
         self.server = server
         self.port = port
 
-    def __enter__(self):
+    def __enter__(self) -> 'WhoisClient':
         """
         Initialize a `with` statement.
         """
@@ -52,13 +53,13 @@ class WhoisClient(object):
         self.sock.settimeout(10)
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type, value, traceback):  # type: ignore
         """
         Terminate a `with` statement.
         """
         self.sock.close()
 
-    def whois(self, query):
+    def whois(self, query: str) -> str:
         """
         Perform a query against the server.
         """
@@ -82,7 +83,7 @@ class WhoisClient(object):
 
 
 @contextlib.contextmanager
-def auto_timeout(self, timeout):
+def auto_timeout(self, timeout: int):  # type: ignore
     """
     Create a timeout for the IOLoop.
     """
@@ -92,7 +93,7 @@ def auto_timeout(self, timeout):
         yield handle
     except tornado.iostream.StreamClosedError:
         if not self._timed_out:
-            logger.exception("Stream Closed, no timeout.")
+            logger.info("Stream Closed by client, no timeout.")
     except Exception:
         logger.exception("Unable to set timeout")
     finally:
@@ -104,7 +105,7 @@ class ClientHandler(object):
     Handle a uWhoisd client.
     """
 
-    def __init__(self, stream, query_fct, client, timeout):
+    def __init__(self, stream, query_fct, client, timeout: int):  # type: ignore
         """
         Handle a uWhoisd client.
         """
@@ -115,7 +116,7 @@ class ClientHandler(object):
         self._timed_out = False
 
     @gen.coroutine
-    def timed_out(self):
+    def timed_out(self):  # type: ignore
         """
         Close the stream if the client doesn't send a query fast enough.
         """
@@ -129,13 +130,15 @@ class ClientHandler(object):
             self.stream.close()
 
     @gen.coroutine
-    def on_connect(self):
+    def on_connect(self):  # type: ignore
         """
         Handle a connexion.
         """
         try:
             with auto_timeout(self, self.timeout):
                 self.data = yield self.stream.read_until_regex(br'\s')
+            if not hasattr(self, 'data') or not self.data:
+                return
             if self._timed_out:
                 return
             whois_query = self.data.decode().strip().lower()
@@ -157,7 +160,7 @@ class WhoisListener(TCPServer):
     Listener for whois clients.
     """
 
-    def __init__(self, whois, timeout=15):
+    def __init__(self, whois: Callable[[str], str], timeout: int=15) -> None:
         """
         Listen to queries from whois clients.
         """
@@ -166,7 +169,7 @@ class WhoisListener(TCPServer):
         self.timeout = timeout
 
     @gen.coroutine
-    def handle_stream(self, stream, address):
+    def handle_stream(self, stream, address):  # type: ignore
         """
         Respond to a single request.
         """
@@ -183,11 +186,11 @@ class WhoisListener(TCPServer):
 
 class ShutdownCallback(PeriodicCallback):
 
-    def stop(self):
+    def stop(self) -> None:
         self.io_loop.stop()
 
 
-def start_service(iface, port, whois):
+def start_service(iface: str, port: int, whois: Callable[[str], str]) -> None:
     """
     Start the service.
     """
@@ -198,7 +201,7 @@ def start_service(iface, port, whois):
     server.bind(port, iface)
     server.start(None)
 
-    def callback():
+    def callback() -> None:
         if shutdown_requested():
             pc.stop()
 
