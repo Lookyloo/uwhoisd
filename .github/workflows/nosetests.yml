@@ -37,7 +37,7 @@ jobs:
       run: |
         poetry run start
         sleep 10
-        pipenv run stop
+        poetry run stop
 
 
     - name: Run mypy
