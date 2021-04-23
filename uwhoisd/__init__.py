@@ -5,7 +5,6 @@ A 'universal' WHOIS proxy server.
 import logging
 import logging.config
 import re
-from re import Pattern
 import socket
 import shlex
 from subprocess import Popen, PIPE
@@ -120,7 +119,7 @@ class UWhois(object):
             port = int(PORT)
         return server, port
 
-    def get_registrar_whois_server(self, pattern: Pattern[str], response: str) -> Optional[str]:
+    def get_registrar_whois_server(self, pattern, response: str) -> Optional[str]:  # type: ignore
         """
         Extract the registrar's WHOIS server from the registry response.
         """
@@ -133,7 +132,7 @@ class UWhois(object):
         """
         return self.prefixes.get(server)
 
-    def get_recursion_pattern(self, server: str) -> Optional[Pattern[str]]:
+    def get_recursion_pattern(self, server: str):  # type: ignore
         """
         Get the recursion pattern after querying a server.
         """
@@ -177,7 +176,7 @@ class UWhois(object):
                 query = f'{prefix} {query}'
             return client.whois(query)
 
-    def _thin_query(self, pattern: Pattern[str], response: str, port: int, query: str) -> str:
+    def _thin_query(self, pattern, response: str, port: int, query: str) -> str:  # type: ignore
         """
         Query a more detailled Whois server if possible.
         """
