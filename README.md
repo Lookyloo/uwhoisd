@@ -36,6 +36,15 @@ poetry run stop
 
 ## Usage
 
+Requesting a whois entry for a fully qualified domain name (FQDN) only works if the request only contains the domain. uWhoisd will automatically strip the subdomain part if it is present in the request.
+
+Example: `www.theguardian.co.uk`
+* TLD: `co.uk` (uWhoisd uses the [Mozilla public suffix list](https://publicsuffix.org/list/) as a reference)
+* Domain: `theguardian.co.uk`
+* Subdomain: `www`
+
+The whois request will be for `theguardian.co.uk`
+
 ### Telnet
 
 ```bash
