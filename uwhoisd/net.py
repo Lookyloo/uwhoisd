@@ -142,7 +142,7 @@ class ClientHandler(object):
             if self._timed_out:
                 return
             whois_query = self.data.decode().strip().lower()
-            if not utils.is_well_formed_fqdn(whois_query) and ':' not in whois_query and 'as' not in whois_query.lower():
+            if not utils.is_well_formed_fqdn(whois_query) and ':' not in whois_query and not whois_query.lower().startswith('as'):
                 whois_entry = "; Bad request: '{0}'\r\n".format(whois_query)
             else:
                 whois_entry = self.query_fct(whois_query)

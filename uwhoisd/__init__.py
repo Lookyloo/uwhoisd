@@ -217,7 +217,7 @@ class UWhois(object):
         elif ':' in query:
             # IPv6, doesn't matter, always fallback to system whois
             zone = 'ipv6'
-        elif 'as' in query.lower():
+        elif query.lower().startswith('as') and query.lower()[2:].isdigit():
             zone = 'asn'
         else:
             # Domain, strip hostname part if needed
