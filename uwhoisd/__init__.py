@@ -148,13 +148,13 @@ class UWhois(object):
             key_burst = f'{server}_burst'
             key_normal = f'{server}_normal'
         if self.redis_ratelimit is not None and ratelimit_details is not None:
-            while self.redis_ratelimit.zcard(key_burst) > int(per_sec):  # type: ignore
+            while self.redis_ratelimit.zcard(key_burst) > int(per_sec):
                 # Max queries per sec reached
                 logger.info(f"Rate limiting on {server} (burst)")
                 time.sleep(.3)
                 # Remove all the keys that are at least 1 sec old
                 self.redis_ratelimit.zremrangebyscore(key_burst, '-inf', time.time() - 1)
-            while self.redis_ratelimit.zcard(key_normal) > int(per_hour):  # type: ignore
+            while self.redis_ratelimit.zcard(key_normal) > int(per_hour):
                 # Max queries per hour reached
                 logger.info(f"Rate limiting on {server}")
                 time.sleep(1)

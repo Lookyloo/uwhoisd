@@ -67,12 +67,8 @@ class WhoisClient(object):
         try:
             bytes_whois = b''
             self.sock.sendall('{0}\r\n'.format(query).encode())
-            while True:
-                data = self.sock.recv(2048)
-                if data:
-                    bytes_whois += data
-                    continue
-                break
+            while data := self.sock.recv(2048):
+                bytes_whois += data
             to_return = str(bytes_whois, 'utf-8', 'ignore')
         except OSError as e:
             # Catches all socket.* exceptions
