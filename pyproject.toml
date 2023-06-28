@@ -8,14 +8,14 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "^3.10"
 tornado = "^6.3.2"
-redis = "^4.5.5"
+redis = "^4.6.0"
 beautifulsoup4 = "^4.12.2"
 publicsuffix2 = "^2.20191221"
 
 [tool.poetry.dev-dependencies]
 Sphinx = "^7.0.1"
-mypy = "^1.3.0"
-types-redis = "^4.5.5.2"
+mypy = "^1.4.1"
+types-redis = "^4.6.0.0"
 
 [tool.poetry.scripts]
 uwhoisd = 'uwhoisd:main'
