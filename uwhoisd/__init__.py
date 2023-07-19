@@ -201,6 +201,9 @@ class UWhois(object):
         """A whois query on a hostname will fail. This method uses the Mozilla TLD list
         to only keep the domain part and remove everything else."""
         tld = psl.get_tld(query, strict=True)
+        if tld == query:
+            # just query the tld
+            return query, tld
         hostname = re.sub(rf"\.{tld}$", "", query)
         if '.' in hostname:
             domain = hostname.split('.')[-1]
