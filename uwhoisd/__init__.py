@@ -12,13 +12,13 @@ import time
 import datetime
 import configparser
 import hashlib
-import argparse
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 from publicsuffix2 import PublicSuffixList, fetch  # type: ignore
 
 from . import net, utils
-from .helpers import set_running, unset_running, get_socket_path
+from .default import get_socket_path
 
 
 logger = logging.getLogger('uwhoisd')
@@ -42,7 +42,7 @@ except Exception as e:
 PORT = socket.getservbyname('whois', 'tcp')
 
 
-class UWhois(object):
+class UWhois():
     """
     Universal WHOIS proxy.
     """
@@ -53,7 +53,7 @@ class UWhois(object):
     prefixes: Dict[str, str]
     ratelimit: Dict[str, str]
 
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: Path):
         parser = configparser.ConfigParser()
         parser.read(config_path)
         self.read_config(parser)
@@ -119,7 +119,7 @@ class UWhois(object):
             port = int(PORT)
         return server, port
 
-    def get_registrar_whois_server(self, pattern, response: str) -> Optional[str]:  # type: ignore
+    def get_registrar_whois_server(self, pattern, response: str) -> Optional[str]:
         """
         Extract the registrar's WHOIS server from the registry response.
         """
@@ -132,7 +132,7 @@ class UWhois(object):
         """
         return self.prefixes.get(server)
 
-    def get_recursion_pattern(self, server: str):  # type: ignore
+    def get_recursion_pattern(self, server: str):
         """
         Get the recursion pattern after querying a server.
         """
@@ -176,7 +176,7 @@ class UWhois(object):
                 query = f'{prefix} {query}'
             return client.whois(query)
 
-    def _thin_query(self, pattern, response: str, port: int, query: str) -> str:  # type: ignore
+    def _thin_query(self, pattern, response: str, port: int, query: str) -> str:
         """
         Query a more detailled Whois server if possible.
         """
@@ -286,24 +286,3 @@ class UWhois(object):
         if self.redis_whowas.hsetnx(domain, datetime.date.today().isoformat(), response_hash):
             logger.info(f"Store {domain} in whowas.")
             self.redis_whowas.set(response_hash, response)
-
-
-def main() -> None:
-    """
-    Execute the daemon.
-    """
-    argparser = argparse.ArgumentParser(description='UWhois server')
-    argparser.add_argument('-c', '--config', type=str, required=True, help='Path to the config file')
-    args = argparser.parse_args()
-
-    logging.config.fileConfig(args.config)
-
-    logger.info(f"Reading config file at '{args.config}'")
-    uwhois = UWhois(args.config)
-    set_running('uwhoisd')
-    net.start_service(uwhois.iface, uwhois.port, uwhois.whois)
-    unset_running('uwhoisd')
-
-
-if __name__ == '__main__':
-    main()

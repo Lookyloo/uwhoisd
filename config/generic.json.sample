@@ -1,0 +1,8 @@
+{
+    "loglevel": "INFO",
+    "systemd_service_name": "uwhoisd",
+    "_notes": {
+        "loglevel": "Can be one of the value listed here: https://docs.python.org/3/library/logging.html#levels",
+        "systemd_service_name": "(Optional) Name of the systemd service if your project has one."
+    }
+}

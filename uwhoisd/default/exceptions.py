@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 
 class UWhoisdException(Exception):
+    pass
+
+
+class MissingEnv(UWhoisdException):
     pass
 
 
@@ -10,5 +13,5 @@ class CreateDirectoryException(UWhoisdException):
     pass
 
 
-class MissingEnv(UWhoisdException):
+class ConfigError(UWhoisdException):
     pass

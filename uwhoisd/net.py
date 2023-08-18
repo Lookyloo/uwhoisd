@@ -4,30 +4,19 @@ Networking code.
 
 import contextlib
 import logging
-import signal
 import socket
 import time
 from typing import Callable
 
 import tornado
 from tornado import gen
-from tornado.ioloop import IOLoop, PeriodicCallback
+from tornado.ioloop import IOLoop
 from tornado.tcpserver import TCPServer
 
 
 from uwhoisd import utils
 
-from uwhoisd.helpers import shutdown_requested
-
-
 logger = logging.getLogger('uwhoisd')
-
-
-def handle_signal(sig, frame) -> None:  # type: ignore
-    """
-    Stop the main loop on signal.
-    """
-    IOLoop.instance().add_callback(IOLoop.instance().stop)
 
 
 class WhoisClient(object):
@@ -53,7 +42,7 @@ class WhoisClient(object):
         self.sock.settimeout(10)
         return self
 
-    def __exit__(self, type, value, traceback):  # type: ignore
+    def __exit__(self, type, value, traceback):
         """
         Terminate a `with` statement.
         """
@@ -79,7 +68,7 @@ class WhoisClient(object):
 
 
 @contextlib.contextmanager
-def auto_timeout(self, timeout: int):  # type: ignore
+def auto_timeout(self, timeout: int):
     """
     Create a timeout for the IOLoop.
     """
@@ -101,7 +90,7 @@ class ClientHandler(object):
     Handle a uWhoisd client.
     """
 
-    def __init__(self, stream, query_fct, client, timeout: int):  # type: ignore
+    def __init__(self, stream, query_fct, client, timeout: int):
         """
         Handle a uWhoisd client.
         """
@@ -112,7 +101,7 @@ class ClientHandler(object):
         self._timed_out = False
 
     @gen.coroutine
-    def timed_out(self):  # type: ignore
+    def timed_out(self):
         """
         Close the stream if the client doesn't send a query fast enough.
         """
@@ -126,7 +115,7 @@ class ClientHandler(object):
             self.stream.close()
 
     @gen.coroutine
-    def on_connect(self):  # type: ignore
+    def on_connect(self):
         """
         Handle a connexion.
         """
@@ -165,7 +154,7 @@ class WhoisListener(TCPServer):
         self.timeout = timeout
 
     @gen.coroutine
-    def handle_stream(self, stream, address):  # type: ignore
+    def handle_stream(self, stream, address):
         """
         Respond to a single request.
         """
@@ -178,30 +167,3 @@ class WhoisListener(TCPServer):
             logger.exception("Unknown exception when handling '%s'", address)
         finally:
             stream.close()
-
-
-class ShutdownCallback(PeriodicCallback):
-
-    def stop(self) -> None:
-        self.io_loop.stop()
-
-
-def start_service(iface: str, port: int, whois: Callable[[str], str]) -> None:
-    """
-    Start the service.
-    """
-    signal.signal(signal.SIGINT, handle_signal)
-    signal.signal(signal.SIGTERM, handle_signal)
-    server = WhoisListener(whois, 15)
-    logger.info("Listen on %s:%d", iface, port)
-    server.bind(port, iface)
-    server.start(None)
-
-    def callback() -> None:
-        if shutdown_requested():
-            pc.stop()
-
-    pc = ShutdownCallback(callback, 3000)
-    pc.start()
-    IOLoop.instance().start()
-    IOLoop.instance().close()

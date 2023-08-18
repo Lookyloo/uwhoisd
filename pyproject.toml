@@ -7,15 +7,15 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-tornado = "^6.3.2"
+tornado = "^6.3.3"
 redis = "^4.6.0"
 beautifulsoup4 = "^4.12.2"
 publicsuffix2 = "^2.20191221"
 
 [tool.poetry.dev-dependencies]
-Sphinx = "^7.0.1"
-mypy = "^1.4.1"
-types-redis = "^4.6.0.2"
+Sphinx = "^7.2.2"
+mypy = "^1.5.1"
+types-redis = "^4.6.0.4"
 
 [tool.poetry.scripts]
 uwhoisd = 'uwhoisd:main'
@@ -23,7 +23,24 @@ run_backend = 'bin.run_backend:main'
 start = 'bin.start:main'
 stop = 'bin.stop:main'
 shutdown = 'bin.shutdown:main'
+update = "bin.update:main"
+uwhoisd_manager = "bin.uwhoisd_manager:main"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+python_version = 3.8
+check_untyped_defs = true
+ignore_errors = false
+ignore_missing_imports = false
+strict_optional = true
+no_implicit_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+warn_unreachable = true
+
+show_error_context = true
+pretty = true

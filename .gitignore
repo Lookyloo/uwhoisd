@@ -35,3 +35,5 @@ pip-log.txt
 
 *.rdb
 
+config/*.json
+

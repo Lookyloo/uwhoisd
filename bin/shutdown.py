@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
-from uwhoisd.helpers import is_running, get_socket_path
 import time
-import os
-from redis import Redis
-from uwhoisd.helpers import get_homedir
-import signal
+
+from uwhoisd.default import AbstractManager
 
 
-def main() -> None:
-    r = Redis(unix_socket_path=get_socket_path('cache'), db=2)
-    r.set('shutdown', 1)
+def main():
+    AbstractManager.force_shutdown()
     time.sleep(5)
     while True:
-        running = is_running()
+        try:
+            running = AbstractManager.is_running()
+        except FileNotFoundError:
+            print('Redis is already down.')
+            break
         if not running:
             break
         print(running)
