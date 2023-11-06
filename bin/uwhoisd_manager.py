@@ -8,6 +8,7 @@ import logging.config
 
 from typing import Optional
 
+import tornado
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.netutil import bind_sockets
 
@@ -47,17 +48,22 @@ class UWhoisdManager(AbstractManager):
     async def _to_run_forever_async(self):
         self.logger.info("Listen on %s:%d", self.uwhois.iface, self.uwhois.port)
         sockets = bind_sockets(self.uwhois.port, self.uwhois.iface)
-        server = WhoisListener(self.uwhois.whois, 15)
-        server.add_sockets(sockets)
+        tornado.process.fork_processes(0)
 
-        def callback() -> None:
-            if self.shutdown_requested():
-                pc.stop()
+        async def post_fork_main():
+            server = WhoisListener(self.uwhois.whois, 15)
+            server.add_sockets(sockets)
 
-        pc = ShutdownCallback(callback, 1000)
-        pc.start()
+            def callback() -> None:
+                if self.shutdown_requested():
+                    pc.stop()
 
-        await asyncio.Event().wait()
+            pc = ShutdownCallback(callback, 1000)
+            pc.start()
+
+            await asyncio.Event().wait()
+
+        asyncio.run(post_fork_main())
 
 
 def main():
