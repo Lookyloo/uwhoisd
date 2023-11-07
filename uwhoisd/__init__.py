@@ -233,21 +233,32 @@ class UWhois():
                 logger.info(f"Redis cache hit for {query}")
                 return response
 
-        if zone in self.overrides:
+        if any(zone.endswith(o) for o in self.overrides):
+            response = ''
+            if zone not in self.overrides:
+                # use server for the whole TLD instead of foo.tld
+                zone = zone.rsplit('.')[-1]
+            if zone in self.tld_no_whois:
+                response += self.tld_no_whois[zone] + '\n'
             server, port = self.get_overwritten_whois_server(zone)
-            # Query the registry's WHOIS server.
-            prefix = self.get_prefix(server)
-            try:
-                response = self._run_query(server, port, query, prefix)
-            except TimeoutError:
-                logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
-            except socket.gaierror:
-                logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
+            if server in self.broken:
+                response += self.broken[zone] + '\n'
+            if not response:
+                # Query the registry's WHOIS server.
+                prefix = self.get_prefix(server)
+                try:
+                    response = self._run_query(server, port, query, prefix)
+                except TimeoutError:
+                    logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
+                    response = f'The whois query failed: {server}:{port} - {query} - {prefix}'
+                except socket.gaierror:
+                    logger.exception(f'The whois query failed: {server}:{port} - {query} - {prefix}')
+                    response = f'The whois query failed: {server}:{port} - {query} - {prefix}'
 
-            # Thin registry? Query the registrar's WHOIS server.
-            recursion_pattern = self.get_recursion_pattern(server)
-            if recursion_pattern is not None:
-                response = self._thin_query(recursion_pattern, response, port, query)
+                # Thin registry? Query the registrar's WHOIS server.
+                recursion_pattern = self.get_recursion_pattern(server)
+                if recursion_pattern is not None:
+                    response = self._thin_query(recursion_pattern, response, port, query)
 
         else:
             # Just use the system whois command
@@ -272,10 +283,6 @@ class UWhois():
         else:
             logger.error(f"Empty response for {query}")
 
-        if server and self.broken.get(server) is not None:
-            response += '\n' + self.broken[server]
-        elif self.tld_no_whois.get(zone) is not None:
-            response += '\n' + self.tld_no_whois[zone]
         return response
 
     def store_whois(self, domain: str, response: str) -> None:
