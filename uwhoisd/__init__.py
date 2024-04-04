@@ -222,6 +222,9 @@ class UWhois():
             zone = 'ipv6'
         elif query.lower().startswith('as') and query.lower()[2:].isdigit():
             zone = 'asn'
+        # if query is no ip, asn or fqdn
+        elif not utils.is_well_formed_fqdn(query):
+            zone = 'abuse-c' # what would  be the correct zone for an abuse-c object
         else:
             # Domain, strip hostname part if needed
             query, zone = self._strip_hostname(query)
