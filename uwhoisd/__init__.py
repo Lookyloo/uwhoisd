@@ -222,6 +222,11 @@ class UWhois():
             zone = 'ipv6'
         elif query.lower().startswith('as') and query.lower()[2:].isdigit():
             zone = 'asn'
+        elif not utils.is_well_formed_fqdn(query):
+            # if query is no ip, asn or fqdn 
+            # it's probably a NIC handle (Network Information Centre handle)
+            # probably an abuse-c object
+            zone = 'NIC-handle' 
         else:
             # Domain, strip hostname part if needed
             query, zone = self._strip_hostname(query)
