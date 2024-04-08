@@ -13,26 +13,38 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.8, 3.9, '3.10']
+        python-version: [3.8, 3.9, '3.10', '3.11', '3.12']
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up Python ${{matrix.python-version}}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: ${{matrix.python-version}}
 
-    - name: Install dependencies
+    - name: Install poetry
+      run: pipx install poetry
+
+    - name: Clone Redis
+      uses: actions/checkout@v4
+      with:
+        repository: redis/redis
+        path: redis-tmp
+        ref: 7.2
+
+    - name: Install and setup redis
       run: |
-        python -m pip install --upgrade pip poetry
+        mv redis-tmp ../redis
         pushd ..
-        git clone https://github.com/redis/redis.git
         pushd redis
         make
         popd
         popd
-        poetry install
+
+    - name: Install dependencies
+      run: |
         echo UWHOISD_HOME="'`pwd`'" > .env
+        poetry install
 
     - name: Run mypy
       run: |
@@ -42,3 +54,4 @@ jobs:
       run: |
         poetry run start
         sleep 10
+        poetry run stop
