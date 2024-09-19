@@ -14,8 +14,8 @@ publicsuffix2 = "^2.20191221"
 
 [tool.poetry.dev-dependencies]
 Sphinx = "^8.0.2"
-mypy = "^1.11.1"
-types-redis = "^4.6.0.20240806"
+mypy = "^1.11.2"
+types-redis = "^4.6.0.20240903"
 
 [tool.poetry.scripts]
 uwhoisd = 'uwhoisd:main'
