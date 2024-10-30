@@ -4,7 +4,7 @@ from __future__ import with_statement
 
 import os.path
 
-from setuptools import setup, find_packages  # type: ignore
+from setuptools import setup, find_packages
 
 
 def read(filename: str) -> str:
@@ -41,7 +41,7 @@ setup(
 
     scripts=['bin/run_backend.py', 'bin/start.py'],
 
-    classifiers=(
+    classifiers=(  # type: ignore[arg-type]
         'Development Status :: 2 - Pre-Alpha',
         'Environment :: No Input/Output (Daemon)',
         'Intended Audience :: System Administrators',
