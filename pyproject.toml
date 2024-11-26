@@ -7,7 +7,7 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-tornado = "^6.4.1"
+tornado = "^6.4.2"
 redis = {version = "^5.2.0", extras = ["hiredis"]}
 beautifulsoup4 = "^4.12.3"
 publicsuffix2 = "^2.20191221"
