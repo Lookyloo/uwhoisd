@@ -9,8 +9,8 @@ requires-python = ">=3.10"
 
 dependencies = [
     "redis[hiredis] (>=5.1.0,<6.0)",
-    "tornado (>=6.5)",
-    "beautifulsoup4 (>=4.13.4)",
+    "tornado (>=6.5.2)",
+    "beautifulsoup4 (>=4.14.2)",
     "publicsuffix2 (>=2.20191221)"
 ]
 
@@ -27,7 +27,7 @@ uwhoisd_manager = "bin.uwhoisd_manager:main"
 docs = ["Sphinx (>=8.2.3) ; python_version >= \"3.11\""]
 
 [tool.poetry.group.dev.dependencies]
-mypy = "^1.15.0"
+mypy = "^1.18.2"
 types-redis = "^4.6.0.20241004"
 
 [build-system]
